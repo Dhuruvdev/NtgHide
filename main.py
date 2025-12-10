@@ -9,6 +9,7 @@ import os
 
 from services.darkweb_scanner import darkweb_service
 from services.deepfake_detector import deepfake_service
+from services.image_origin_tracer import image_origin_service
 
 app = FastAPI()
 
@@ -75,6 +76,20 @@ async def deepfake_upload(file: UploadFile = File(...)):
         contents = await file.read()
         filename = file.filename if file.filename else "unknown_file"
         results = await deepfake_service.analyze_file(contents, filename)
+        return JSONResponse(content={"status": "success", "data": results})
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
+
+
+@app.post("/api/origin/trace")
+async def origin_trace(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        filename = file.filename if file.filename else "unknown_file"
+        results = await image_origin_service.analyze(contents, filename)
         return JSONResponse(content={"status": "success", "data": results})
     except Exception as e:
         return JSONResponse(
