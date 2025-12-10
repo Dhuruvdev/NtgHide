@@ -935,10 +935,11 @@
                 const response = await fetch('/api/status');
                 const data = await response.json();
                 
-                const darkwebInstalled = data.modules.h8mail.installed || 
-                                         data.modules.TorCrawl.installed || 
-                                         data.modules.WhatBreach.installed;
-                const deepfakeInstalled = data.modules.FACTOR.installed;
+                const darkwebInstalled = (data.modules.h8mail && data.modules.h8mail.installed) || 
+                                         (data.modules.TorCrawl && data.modules.TorCrawl.installed) || 
+                                         (data.modules.WhatBreach && data.modules.WhatBreach.installed);
+                const deepfakeInstalled = data.modules['DeepFake-Image-Detection'] && 
+                                          data.modules['DeepFake-Image-Detection'].installed;
                 
                 document.getElementById('darkweb-status').className = 
                     'status-indicator' + (darkwebInstalled ? '' : ' warning');

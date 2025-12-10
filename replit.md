@@ -55,11 +55,11 @@ Uses WhatBreach and SpiderFoot modules directly:
 
 No external API keys required - uses free public sources.
 
-### FACTOR (Deepfake Detection)
-Custom detect.py script that analyzes images and videos for deepfake indicators:
+### DeepFake-Image-Detection (Deepfake Detection)
+Multi-layer image analysis system that analyzes images for deepfake indicators:
 - Supports image formats: jpg, jpeg, png, bmp, gif, webp
-- Supports video formats: mp4, avi, mov, mkv, webm, wmv
-- Returns confidence score and analysis details
+- Uses 9 analysis methods including convolutional feature extraction, ELA, frequency domain analysis
+- Returns confidence score, verdict, and detailed analysis breakdown
 
 ## Running the Application
 ```bash
