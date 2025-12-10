@@ -431,54 +431,48 @@ class SpiderFootScanner:
             return {"success": False, "error": str(e), "events": []}
     
     async def scan_leakdb(self, email: str) -> ScanResult:
-        """Check known breach databases using SpiderFoot logic"""
+        """Check breach databases using LeakCheck API (free tier)"""
         breaches = []
         classified = []
         
         try:
-            domain = email.split('@')[-1].lower() if '@' in email else ''
-            
-            known_breaches = {
-                "linkedin.com": {"name": "LinkedIn", "date": "2021-04-08", "count": 700000000, "types": ["Email Addresses", "Phone Numbers", "Names"]},
-                "facebook.com": {"name": "Facebook", "date": "2021-04-03", "count": 533000000, "types": ["Email Addresses", "Phone Numbers", "Names", "Locations"]},
-                "twitter.com": {"name": "Twitter", "date": "2023-01-04", "count": 200000000, "types": ["Email Addresses", "Usernames"]},
-                "x.com": {"name": "Twitter/X", "date": "2023-01-04", "count": 200000000, "types": ["Email Addresses", "Usernames"]},
-                "adobe.com": {"name": "Adobe", "date": "2013-10-04", "count": 153000000, "types": ["Email Addresses", "Passwords", "Usernames"]},
-                "dropbox.com": {"name": "Dropbox", "date": "2012-07-01", "count": 68000000, "types": ["Email Addresses", "Passwords"]},
-                "yahoo.com": {"name": "Yahoo", "date": "2016-09-22", "count": 3000000000, "types": ["Email Addresses", "Passwords", "Security Questions"]},
-                "gmail.com": {"name": "Collection #1", "date": "2019-01-16", "count": 773000000, "types": ["Email Addresses", "Passwords"]},
-                "hotmail.com": {"name": "Collection #1", "date": "2019-01-16", "count": 773000000, "types": ["Email Addresses", "Passwords"]},
-                "outlook.com": {"name": "Collection #1", "date": "2019-01-16", "count": 773000000, "types": ["Email Addresses", "Passwords"]},
-                "aol.com": {"name": "Collection #1", "date": "2019-01-16", "count": 773000000, "types": ["Email Addresses", "Passwords"]},
-                "icloud.com": {"name": "Various Breaches", "date": "2020-01-01", "count": 10000000, "types": ["Email Addresses"]},
-            }
-            
-            if domain in known_breaches:
-                breach_data = known_breaches[domain]
-                breach_info = BreachInfo(
-                    name=breach_data["name"].lower().replace(" ", "_"),
-                    title=breach_data["name"],
-                    domain=domain,
-                    breach_date=breach_data["date"],
-                    pwn_count=breach_data["count"],
-                    description=f"Your email domain was affected by the {breach_data['name']} breach affecting {breach_data['count']:,} accounts.",
-                    data_classes=breach_data["types"],
-                    is_verified=True,
-                    source="SpiderFoot/LeakDB"
-                )
-                breaches.append(breach_info)
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                check_url = f"https://leakcheck.io/api/public?check={email}"
+                headers = {"User-Agent": "SecurityScanner/1.0"}
                 
-                classified.append(ClassifiedResult(
-                    threat_level=determine_threat_level(breach_data["types"]),
-                    category=determine_category(breach_data["types"]),
-                    source=breach_data["name"],
-                    source_domain=domain,
-                    description=f"Major breach affecting {breach_data['count']:,} accounts",
-                    breach_date=breach_data["date"],
-                    records_affected=breach_data["count"],
-                    data_types=breach_data["types"],
-                    is_verified=True
-                ))
+                try:
+                    response = await client.get(check_url, headers=headers)
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data.get("found", False):
+                            sources = data.get("sources", [])
+                            for source in sources[:5]:
+                                breach_info = BreachInfo(
+                                    name=source.get("name", "unknown").lower().replace(" ", "_"),
+                                    title=source.get("name", "Unknown Breach"),
+                                    domain=source.get("domain", "unknown"),
+                                    breach_date=source.get("date", "Unknown"),
+                                    pwn_count=source.get("count", 0),
+                                    description=f"Email found in {source.get('name', 'unknown')} breach",
+                                    data_classes=["Email Addresses"],
+                                    is_verified=True,
+                                    source="SpiderFoot/LeakCheck"
+                                )
+                                breaches.append(breach_info)
+                                
+                                classified.append(ClassifiedResult(
+                                    threat_level=ThreatLevel.HIGH,
+                                    category=DataCategory.BREACH_DATABASE,
+                                    source=source.get("name", "Unknown"),
+                                    source_domain=source.get("domain", "unknown"),
+                                    description=f"Email confirmed in breach database",
+                                    breach_date=source.get("date", "Unknown"),
+                                    records_affected=source.get("count", 0),
+                                    data_types=["Email Addresses"],
+                                    is_verified=True
+                                ))
+                except:
+                    pass
             
             return ScanResult(
                 source="SpiderFoot/LeakDB",
