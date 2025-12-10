@@ -163,6 +163,11 @@
             box-shadow: 0 0 10px #ffaa00;
         }
 
+        .status-indicator.error {
+            background: #ff4444;
+            box-shadow: 0 0 10px #ff4444;
+        }
+
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -172,97 +177,81 @@
             padding: 24px;
         }
 
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 12px 0;
-            border-bottom: 1px solid #1a1a1a;
+        .search-section {
+            margin-bottom: 20px;
         }
 
-        .info-row:last-child {
-            border-bottom: none;
-        }
-
-        .label {
-            color: #666;
-            font-size: 14px;
-        }
-
-        .value {
+        .search-label {
+            display: block;
             color: #888;
-            font-size: 14px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
         }
 
-        .value.active {
-            color: #00ff00;
-        }
-
-        .value.warning {
-            color: #ff4444;
-            animation: blink 1.5s infinite;
-        }
-
-        .module-list {
+        .search-input-wrapper {
             display: flex;
-            flex-direction: column;
-            gap: 15px;
+            gap: 10px;
         }
 
-        .module-item {
+        .search-input {
+            flex: 1;
+            padding: 15px 20px;
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 6px;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .search-input:focus {
+            border-color: #00ff00;
+        }
+
+        .search-input::placeholder {
+            color: #444;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            flex: 1;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-input-label {
             display: flex;
             align-items: center;
-            gap: 15px;
-            padding: 15px;
+            justify-content: center;
+            gap: 10px;
+            padding: 15px 20px;
             background: #0a0a0a;
-            border: 1px solid #1a1a1a;
+            border: 1px dashed #333;
             border-radius: 6px;
+            color: #666;
+            font-size: 14px;
+            cursor: pointer;
             transition: all 0.3s ease;
         }
 
-        .module-item:hover {
-            border-color: #333;
-            background: #111;
-        }
-
-        .module-icon {
-            color: #333;
-            font-size: 20px;
-        }
-
-        .module-name {
-            flex: 1;
-            color: #ccc;
-            font-size: 14px;
-        }
-
-        .module-status {
-            font-size: 12px;
-            padding: 4px 12px;
-            border-radius: 4px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .module-status.ready {
-            background: rgba(0, 255, 0, 0.1);
+        .file-input-label:hover {
+            border-color: #00ff00;
             color: #00ff00;
-            border: 1px solid rgba(0, 255, 0, 0.3);
         }
 
-        .module-status.locked {
-            background: rgba(255, 0, 0, 0.1);
-            color: #ff4444;
-            border: 1px solid rgba(255, 0, 0, 0.3);
-        }
-
-        .action-buttons {
-            display: flex;
-            gap: 15px;
-            margin-top: 30px;
+        .file-input-label.has-file {
+            border-color: #00ff00;
+            border-style: solid;
+            color: #00ff00;
         }
 
         .btn {
-            flex: 1;
             padding: 15px 30px;
             font-family: 'Courier New', monospace;
             font-size: 14px;
@@ -286,15 +275,137 @@
             box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
         }
 
-        .btn-secondary {
-            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
-            color: #888;
-            border: 1px solid #333;
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
-        .btn-secondary:hover {
-            border-color: #555;
-            color: #ccc;
+        .btn-primary:disabled:hover {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+            color: #00ff00;
+            box-shadow: none;
+        }
+
+        .results-section {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .results-section.active {
+            display: block;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: #0a0a0a;
+            border: 1px solid #222;
+            border-radius: 6px 6px 0 0;
+        }
+
+        .results-title {
+            color: #888;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .results-status {
+            font-size: 12px;
+            padding: 4px 12px;
+            border-radius: 4px;
+        }
+
+        .results-status.success {
+            background: rgba(0, 255, 0, 0.1);
+            color: #00ff00;
+            border: 1px solid rgba(0, 255, 0, 0.3);
+        }
+
+        .results-status.error {
+            background: rgba(255, 0, 0, 0.1);
+            color: #ff4444;
+            border: 1px solid rgba(255, 0, 0, 0.3);
+        }
+
+        .results-status.scanning {
+            background: rgba(255, 170, 0, 0.1);
+            color: #ffaa00;
+            border: 1px solid rgba(255, 170, 0, 0.3);
+            animation: blink 1s infinite;
+        }
+
+        .results-body {
+            padding: 20px;
+            background: #111;
+            border: 1px solid #222;
+            border-top: none;
+            border-radius: 0 0 6px 6px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .result-item {
+            padding: 15px;
+            background: #0a0a0a;
+            border: 1px solid #1a1a1a;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+
+        .result-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .result-source {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .result-source-name {
+            color: #aaa;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .result-source-status {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 3px;
+        }
+
+        .result-source-status.found {
+            background: rgba(255, 0, 0, 0.2);
+            color: #ff4444;
+        }
+
+        .result-source-status.clear {
+            background: rgba(0, 255, 0, 0.2);
+            color: #00ff00;
+        }
+
+        .result-source-status.error {
+            background: rgba(255, 170, 0, 0.2);
+            color: #ffaa00;
+        }
+
+        .result-details {
+            color: #666;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .result-details pre {
+            background: #000;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
         }
 
         footer {
@@ -315,7 +426,7 @@
                 font-size: 32px;
             }
             
-            .action-buttons {
+            .search-input-wrapper {
                 flex-direction: column;
             }
             
@@ -323,6 +434,21 @@
                 letter-spacing: 5px;
                 font-size: 12px;
             }
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(0, 255, 0, 0.3);
+            border-radius: 50%;
+            border-top-color: #00ff00;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -344,54 +470,59 @@
             <main>
                 <div class="card">
                     <div class="card-header">
-                        <span class="status-indicator"></span>
-                        <h2>System Status</h2>
+                        <span class="status-indicator" id="darkweb-status"></span>
+                        <h2>Darkweb Data Breach Scan</h2>
                     </div>
                     <div class="card-body">
-                        <div class="info-row">
-                            <span class="label">Status:</span>
-                            <span class="value active">ACTIVE</span>
+                        <div class="search-section">
+                            <label class="search-label">Check if your data appears on the darkweb</label>
+                            <div class="search-input-wrapper">
+                                <input type="text" class="search-input" id="darkweb-query" placeholder="Enter email address to scan...">
+                                <button class="btn btn-primary" id="darkweb-scan-btn" onclick="scanDarkweb()">
+                                    Scan
+                                </button>
+                            </div>
                         </div>
-                        <div class="info-row">
-                            <span class="label">Mode:</span>
-                            <span class="value">[REDACTED]</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="label">Access Level:</span>
-                            <span class="value warning">CLASSIFIED</span>
+                        <div class="results-section" id="darkweb-results">
+                            <div class="results-header">
+                                <span class="results-title">Scan Results</span>
+                                <span class="results-status" id="darkweb-results-status">Scanning...</span>
+                            </div>
+                            <div class="results-body" id="darkweb-results-body">
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="card">
                     <div class="card-header">
-                        <span class="status-indicator warning"></span>
-                        <h2>Modules</h2>
+                        <span class="status-indicator warning" id="deepfake-status"></span>
+                        <h2>Deepfake Detection Scan</h2>
                     </div>
                     <div class="card-body">
-                        <div class="module-list">
-                            <div class="module-item">
-                                <span class="module-icon">&#9608;</span>
-                                <span class="module-name">Darkweb Scan</span>
-                                <span class="module-status ready">Ready</span>
+                        <div class="search-section">
+                            <label class="search-label">Upload image or video to analyze for deepfakes</label>
+                            <div class="search-input-wrapper">
+                                <div class="file-input-wrapper">
+                                    <input type="file" class="file-input" id="deepfake-file" accept="image/*,video/*" onchange="handleFileSelect(this)">
+                                    <label for="deepfake-file" class="file-input-label" id="deepfake-file-label">
+                                        <span>&#128206;</span> Choose file to scan...
+                                    </label>
+                                </div>
+                                <button class="btn btn-primary" id="deepfake-scan-btn" onclick="scanDeepfake()" disabled>
+                                    Analyze
+                                </button>
                             </div>
-                            <div class="module-item">
-                                <span class="module-icon">&#9608;</span>
-                                <span class="module-name">Deepfake Detection</span>
-                                <span class="module-status ready">Ready</span>
+                        </div>
+                        <div class="results-section" id="deepfake-results">
+                            <div class="results-header">
+                                <span class="results-title">Analysis Results</span>
+                                <span class="results-status" id="deepfake-results-status">Analyzing...</span>
                             </div>
-                            <div class="module-item">
-                                <span class="module-icon">&#9608;</span>
-                                <span class="module-name">[CENSORED]</span>
-                                <span class="module-status locked">Locked</span>
+                            <div class="results-body" id="deepfake-results-body">
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <div class="action-buttons">
-                    <button class="btn btn-primary">Initialize Scan</button>
-                    <button class="btn btn-secondary">View Reports</button>
                 </div>
             </main>
 
@@ -415,7 +546,220 @@
                     loadingOverlay.style.display = 'none';
                 }, 500);
             }, 1500);
+            
+            checkModuleStatus();
         });
+
+        async function checkModuleStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                const darkwebInstalled = data.modules.h8mail.installed || 
+                                         data.modules.TorCrawl.installed || 
+                                         data.modules.WhatBreach.installed;
+                const deepfakeInstalled = data.modules.FACTOR.installed;
+                
+                document.getElementById('darkweb-status').className = 
+                    'status-indicator' + (darkwebInstalled ? '' : ' warning');
+                document.getElementById('deepfake-status').className = 
+                    'status-indicator' + (deepfakeInstalled ? '' : ' warning');
+            } catch (e) {
+                console.error('Failed to check module status:', e);
+            }
+        }
+
+        var selectedFile = null;
+
+        function handleFileSelect(input) {
+            if (input.files && input.files[0]) {
+                selectedFile = input.files[0];
+                var label = document.getElementById('deepfake-file-label');
+                label.innerHTML = '<span>&#128206;</span> ' + selectedFile.name;
+                label.classList.add('has-file');
+                document.getElementById('deepfake-scan-btn').disabled = false;
+            }
+        }
+
+        async function scanDarkweb() {
+            var query = document.getElementById('darkweb-query').value.trim();
+            if (!query) {
+                alert('Please enter an email address to scan');
+                return;
+            }
+
+            var btn = document.getElementById('darkweb-scan-btn');
+            var resultsSection = document.getElementById('darkweb-results');
+            var resultsStatus = document.getElementById('darkweb-results-status');
+            var resultsBody = document.getElementById('darkweb-results-body');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Scanning...';
+            resultsSection.classList.add('active');
+            resultsStatus.className = 'results-status scanning';
+            resultsStatus.textContent = 'Scanning...';
+            resultsBody.innerHTML = '<div class="result-item"><div class="result-details">Running scan across h8mail, TorCrawl, and WhatBreach...</div></div>';
+
+            try {
+                const response = await fetch('/api/darkweb/scan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    displayDarkwebResults(data.data);
+                } else {
+                    resultsStatus.className = 'results-status error';
+                    resultsStatus.textContent = 'Error';
+                    resultsBody.innerHTML = '<div class="result-item"><div class="result-details">' + data.message + '</div></div>';
+                }
+            } catch (e) {
+                resultsStatus.className = 'results-status error';
+                resultsStatus.textContent = 'Error';
+                resultsBody.innerHTML = '<div class="result-item"><div class="result-details">Failed to connect to scan service: ' + e.message + '</div></div>';
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Scan';
+        }
+
+        function displayDarkwebResults(data) {
+            var resultsStatus = document.getElementById('darkweb-results-status');
+            var resultsBody = document.getElementById('darkweb-results-body');
+
+            if (data.total_found > 0) {
+                resultsStatus.className = 'results-status error';
+                resultsStatus.textContent = 'BREACHES DETECTED';
+            } else {
+                resultsStatus.className = 'results-status success';
+                resultsStatus.textContent = 'NO BREACHES FOUND';
+            }
+
+            var html = '';
+            data.sources.forEach(function(source) {
+                var statusClass = source.error ? 'error' : (source.found ? 'found' : 'clear');
+                var statusText = source.error ? 'ERROR' : (source.found ? 'FOUND' : 'CLEAR');
+                
+                html += '<div class="result-item">';
+                html += '<div class="result-source">';
+                html += '<span class="result-source-name">' + source.source + '</span>';
+                html += '<span class="result-source-status ' + statusClass + '">' + statusText + '</span>';
+                html += '</div>';
+                html += '<div class="result-details">';
+                
+                if (source.error) {
+                    html += source.error;
+                } else if (source.found && source.data.length > 0) {
+                    html += '<pre>' + JSON.stringify(source.data, null, 2) + '</pre>';
+                } else {
+                    html += 'No data found for this query.';
+                }
+                
+                html += '</div></div>';
+            });
+
+            resultsBody.innerHTML = html;
+        }
+
+        async function scanDeepfake() {
+            if (!selectedFile) {
+                alert('Please select a file to analyze');
+                return;
+            }
+
+            var btn = document.getElementById('deepfake-scan-btn');
+            var resultsSection = document.getElementById('deepfake-results');
+            var resultsStatus = document.getElementById('deepfake-results-status');
+            var resultsBody = document.getElementById('deepfake-results-body');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Analyzing...';
+            resultsSection.classList.add('active');
+            resultsStatus.className = 'results-status scanning';
+            resultsStatus.textContent = 'Analyzing...';
+            resultsBody.innerHTML = '<div class="result-item"><div class="result-details">Running FACTOR deepfake analysis...</div></div>';
+
+            try {
+                var formData = new FormData();
+                formData.append('file', selectedFile);
+
+                const response = await fetch('/api/deepfake/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    displayDeepfakeResults(data.data);
+                } else {
+                    resultsStatus.className = 'results-status error';
+                    resultsStatus.textContent = 'Error';
+                    resultsBody.innerHTML = '<div class="result-item"><div class="result-details">' + data.message + '</div></div>';
+                }
+            } catch (e) {
+                resultsStatus.className = 'results-status error';
+                resultsStatus.textContent = 'Error';
+                resultsBody.innerHTML = '<div class="result-item"><div class="result-details">Failed to analyze file: ' + e.message + '</div></div>';
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Analyze';
+        }
+
+        function displayDeepfakeResults(data) {
+            var resultsStatus = document.getElementById('deepfake-results-status');
+            var resultsBody = document.getElementById('deepfake-results-body');
+
+            var result = data.result;
+            
+            if (result.error) {
+                resultsStatus.className = 'results-status error';
+                resultsStatus.textContent = 'ERROR';
+                resultsBody.innerHTML = '<div class="result-item"><div class="result-details">' + result.error + '</div></div>';
+                return;
+            }
+
+            if (result.is_deepfake === true) {
+                resultsStatus.className = 'results-status error';
+                resultsStatus.textContent = 'DEEPFAKE DETECTED';
+            } else if (result.is_deepfake === false) {
+                resultsStatus.className = 'results-status success';
+                resultsStatus.textContent = 'AUTHENTIC';
+            } else {
+                resultsStatus.className = 'results-status scanning';
+                resultsStatus.textContent = 'UNKNOWN';
+            }
+
+            var html = '<div class="result-item">';
+            html += '<div class="result-source">';
+            html += '<span class="result-source-name">FACTOR Analysis</span>';
+            html += '</div>';
+            html += '<div class="result-details">';
+            html += '<p><strong>File:</strong> ' + result.filename + '</p>';
+            
+            if (result.confidence !== null) {
+                html += '<p><strong>Confidence:</strong> ' + (result.confidence * 100).toFixed(2) + '%</p>';
+            }
+            
+            if (result.is_deepfake !== null) {
+                html += '<p><strong>Result:</strong> ' + (result.is_deepfake ? 'This appears to be a DEEPFAKE' : 'This appears to be AUTHENTIC') + '</p>';
+            }
+            
+            if (result.analysis_details && Object.keys(result.analysis_details).length > 0) {
+                html += '<p><strong>Details:</strong></p>';
+                html += '<pre>' + JSON.stringify(result.analysis_details, null, 2) + '</pre>';
+            }
+            
+            html += '</div></div>';
+
+            resultsBody.innerHTML = html;
+        }
     </script>
 </body>
 </html>
