@@ -10,10 +10,13 @@ dependencies = [
     "httpx>=0.28.1",
     "jinja2>=3.1.6",
     "numpy>=2.3.5",
+    "openai>=2.9.0",
     "opencv-python-headless>=4.11.0.86",
     "pillow>=12.0.0",
     "pydantic>=2.12.5",
     "python-multipart>=0.0.20",
     "requests>=2.31.0",
+    "scikit-image>=0.25.2",
+    "scipy>=1.16.3",
     "uvicorn>=0.38.0",
 ]
