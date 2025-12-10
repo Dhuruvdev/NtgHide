@@ -33,39 +33,59 @@ class DeepfakeResult:
 
 class FACTORDetector:
     def __init__(self):
-        self.module_path = "Modules/deepfake scan/FACTOR"
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.module_path = os.path.join(base_dir, "Modules", "deepfake scan", "FACTOR")
+        self.detect_script = os.path.join(self.module_path, "detect.py")
 
     async def analyze(self, file_path: str, filename: str) -> DeepfakeResult:
         try:
-            if os.path.exists(self.module_path) and os.listdir(self.module_path):
+            if os.path.exists(self.detect_script):
+                abs_file_path = os.path.abspath(file_path)
+                
                 process = await asyncio.create_subprocess_exec(
-                    "python", "detect.py", "--input", file_path,
+                    "python", self.detect_script, "--input", abs_file_path, "--verbose",
                     stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                    cwd=self.module_path
+                    stderr=asyncio.subprocess.PIPE
                 )
                 stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=120)
                 
                 if stdout:
                     output = stdout.decode()
-                    is_fake = "fake" in output.lower() or "deepfake" in output.lower()
-                    confidence = 0.0
                     
-                    if "confidence" in output.lower():
-                        try:
-                            match = re.search(r'(\d+\.?\d*)%?', output)
-                            if match:
-                                confidence = float(match.group(1))
-                                if confidence > 1:
-                                    confidence = confidence / 100
-                        except Exception:
-                            pass
+                    is_fake = "POTENTIAL DEEPFAKE DETECTED" in output
+                    is_authentic = "LIKELY AUTHENTIC" in output
+                    
+                    confidence = 0.0
+                    confidence_match = re.search(r'Confidence:\s*(\d+\.?\d*)%', output)
+                    if confidence_match:
+                        confidence = float(confidence_match.group(1)) / 100
+                    
+                    if is_fake:
+                        result_status = "potential_deepfake"
+                    elif is_authentic:
+                        result_status = "likely_authentic"
+                    else:
+                        result_status = "inconclusive"
                     
                     return DeepfakeResult(
                         filename=filename,
                         is_deepfake=is_fake,
                         confidence=confidence,
-                        analysis_details={"raw_output": output}
+                        analysis_details={
+                            "raw_output": output,
+                            "result_status": result_status,
+                            "analysis_method": "FACTOR heuristic analysis"
+                        }
+                    )
+                
+                if stderr:
+                    error_output = stderr.decode()
+                    return DeepfakeResult(
+                        filename=filename,
+                        is_deepfake=None,
+                        confidence=None,
+                        analysis_details={"stderr": error_output},
+                        error=f"Analysis error: {error_output[:200]}"
                     )
                     
                 return DeepfakeResult(
@@ -81,7 +101,7 @@ class FACTORDetector:
                     is_deepfake=None,
                     confidence=None,
                     analysis_details={},
-                    error="FACTOR module not installed - add FACTOR to Modules/deepfake scan/FACTOR"
+                    error="FACTOR detect.py not found - module may not be properly installed"
                 )
 
         except asyncio.TimeoutError:
