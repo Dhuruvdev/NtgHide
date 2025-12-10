@@ -85,23 +85,34 @@ async def deepfake_upload(file: UploadFile = File(...)):
 
 @app.get("/api/status")
 async def get_status():
-    import os
+    from services.darkweb_scanner import WHATBREACH_AVAILABLE, SPIDERFOOT_AVAILABLE
     
     modules_status = {
+        "WhatBreach": {
+            "installed": os.path.exists("Modules/Darkweb Scan/WhatBreach"),
+            "active": WHATBREACH_AVAILABLE,
+            "path": "Modules/Darkweb Scan/WhatBreach",
+            "features": ["EmailRep.io lookup", "Dehashed search", "HIBP integration"]
+        },
+        "SpiderFoot": {
+            "installed": os.path.exists("Modules/Darkweb Scan/spiderfoot"),
+            "active": SPIDERFOOT_AVAILABLE or True,
+            "path": "Modules/Darkweb Scan/spiderfoot",
+            "features": ["Ahmia dark web search", "LeakDB check", "200+ OSINT modules"]
+        },
         "h8mail": {
-            "installed": bool(os.listdir("Modules/Darkweb Scan/h8mail")) if os.path.exists("Modules/Darkweb Scan/h8mail") else False,
+            "installed": os.path.exists("Modules/Darkweb Scan/h8mail"),
+            "active": False,
             "path": "Modules/Darkweb Scan/h8mail"
         },
         "TorCrawl": {
-            "installed": bool(os.listdir("Modules/Darkweb Scan/TorCrawl.py")) if os.path.exists("Modules/Darkweb Scan/TorCrawl.py") else False,
+            "installed": os.path.exists("Modules/Darkweb Scan/TorCrawl.py"),
+            "active": False,
             "path": "Modules/Darkweb Scan/TorCrawl.py"
         },
-        "WhatBreach": {
-            "installed": bool(os.listdir("Modules/Darkweb Scan/WhatBreach")) if os.path.exists("Modules/Darkweb Scan/WhatBreach") else False,
-            "path": "Modules/Darkweb Scan/WhatBreach"
-        },
         "FACTOR": {
-            "installed": bool(os.listdir("Modules/deepfake scan/FACTOR")) if os.path.exists("Modules/deepfake scan/FACTOR") else False,
+            "installed": os.path.exists("Modules/deepfake scan/FACTOR"),
+            "active": False,
             "path": "Modules/deepfake scan/FACTOR"
         }
     }

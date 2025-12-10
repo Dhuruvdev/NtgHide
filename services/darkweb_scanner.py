@@ -21,6 +21,23 @@ if whatbreach_path not in sys.path:
 if spiderfoot_path not in sys.path:
     sys.path.insert(0, spiderfoot_path)
 
+try:
+    from hookers.emailrep_io_hook import EmailRepHook
+    from hookers.dehashed_hook import DehashedHook
+    from hookers.hibp_hook import BeenPwnedHook
+    WHATBREACH_AVAILABLE = True
+except ImportError:
+    WHATBREACH_AVAILABLE = False
+    EmailRepHook = None
+    DehashedHook = None
+    BeenPwnedHook = None
+
+try:
+    from modules import sfp_ahmia, sfp_haveibeenpwned
+    SPIDERFOOT_AVAILABLE = True
+except ImportError:
+    SPIDERFOOT_AVAILABLE = False
+
 
 class ThreatLevel(Enum):
     CRITICAL = "CRITICAL"
@@ -185,11 +202,12 @@ class WhatBreachScanner:
         
     def _run_emailrep_hook(self, email: str) -> Dict[str, Any]:
         """Run EmailRepHook from WhatBreach synchronously"""
+        old_cwd = os.getcwd()
         try:
-            old_cwd = os.getcwd()
-            os.chdir(self.module_path)
+            if not WHATBREACH_AVAILABLE or EmailRepHook is None:
+                return {"success": False, "error": "WhatBreach EmailRep module not available", "profiles": []}
             
-            from hookers.emailrep_io_hook import EmailRepHook
+            os.chdir(self.module_path)
             
             hook = EmailRepHook(email)
             profiles = hook.hooker()
@@ -201,8 +219,6 @@ class WhatBreachScanner:
                 "profiles": profiles if profiles else [],
                 "email": email
             }
-        except ImportError as e:
-            return {"success": False, "error": f"Import error: {str(e)}", "profiles": []}
         except Exception as e:
             try:
                 os.chdir(old_cwd)
@@ -212,11 +228,12 @@ class WhatBreachScanner:
     
     def _run_dehashed_hook(self, breaches: List[str]) -> Dict[str, Any]:
         """Run DehashedHook from WhatBreach synchronously"""
+        old_cwd = os.getcwd()
         try:
-            old_cwd = os.getcwd()
-            os.chdir(self.module_path)
+            if not WHATBREACH_AVAILABLE or DehashedHook is None:
+                return {"success": False, "error": "WhatBreach Dehashed module not available", "results": {}}
             
-            from hookers.dehashed_hook import DehashedHook
+            os.chdir(self.module_path)
             
             hook = DehashedHook(breaches)
             results = hook.hooker()
@@ -228,8 +245,6 @@ class WhatBreachScanner:
                 "results": results if results else {},
                 "breaches_checked": breaches
             }
-        except ImportError as e:
-            return {"success": False, "error": f"Import error: {str(e)}", "results": {}}
         except Exception as e:
             try:
                 os.chdir(old_cwd)
@@ -396,15 +411,11 @@ class SpiderFootScanner:
     
     def _run_spiderfoot_module(self, module_name: str, query: str, query_type: str) -> Dict[str, Any]:
         """Run a SpiderFoot module synchronously"""
+        old_cwd = os.getcwd()
         try:
-            old_cwd = os.getcwd()
             os.chdir(self.module_path)
             
-            sys.path.insert(0, self.module_path)
-            
-            from spiderfoot import SpiderFootHelpers as helpers
-            
-            module_file = f"modules/sfp_{module_name}.py"
+            module_file = os.path.join(self.module_path, "modules", f"sfp_{module_name}.py")
             if not os.path.exists(module_file):
                 os.chdir(old_cwd)
                 return {"success": False, "error": f"Module {module_name} not found", "events": []}
@@ -412,12 +423,6 @@ class SpiderFootScanner:
             os.chdir(old_cwd)
             return {"success": True, "events": [], "module": module_name}
             
-        except ImportError as e:
-            try:
-                os.chdir(old_cwd)
-            except:
-                pass
-            return {"success": False, "error": f"SpiderFoot import error: {str(e)}", "events": []}
         except Exception as e:
             try:
                 os.chdir(old_cwd)
