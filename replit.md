@@ -83,3 +83,6 @@ uvicorn main:app --host 0.0.0.0 --port 5000 --reload
 - 2025-12-10: Created FACTOR detect.py script for deepfake detection
 - 2025-12-10: Integrated WhatBreach hooks (EmailRepHook, DehashedHook) directly
 - 2025-12-10: Added SpiderFoot LeakDB and Ahmia dark web scanning
+- 2025-12-10: Created missing WhatBreach lib folder (settings.py, formatter.py, cmd.py) for proper module imports
+- 2025-12-10: Fixed import paths for WhatBreach and SpiderFoot direct module access
+- 2025-12-10: Updated /api/status endpoint to show module integration status
