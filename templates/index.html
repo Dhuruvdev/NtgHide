@@ -3,13 +3,333 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <title>Censored Scanner</title>
-    <link href="{{ url_for('static', path='/css/style.css') }}" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #0a0a0a;
+            color: #e0e0e0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+
+        #loading-overlay.fade-out {
+            opacity: 0;
+        }
+
+        .loading-container {
+            text-align: center;
+        }
+
+        .loading-gif {
+            width: 150px;
+            height: 150px;
+            border: 2px solid #333;
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #666;
+            letter-spacing: 3px;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #main-content {
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        #main-content.visible {
+            opacity: 1;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid #222;
+        }
+
+        .glitch {
+            font-size: 48px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 
+                2px 0 #ff0000,
+                -2px 0 #00ff00;
+            animation: glitch 2s infinite;
+            letter-spacing: 5px;
+        }
+
+        @keyframes glitch {
+            0%, 90%, 100% {
+                text-shadow: 2px 0 #ff0000, -2px 0 #00ff00;
+            }
+            92% {
+                text-shadow: -2px 0 #ff0000, 2px 0 #00ff00;
+            }
+            94% {
+                text-shadow: 2px 2px #ff0000, -2px -2px #00ff00;
+            }
+            96% {
+                text-shadow: -2px -2px #ff0000, 2px 2px #00ff00;
+            }
+            98% {
+                text-shadow: 2px 0 #ff0000, -2px 0 #00ff00;
+            }
+        }
+
+        .subtitle {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 10px;
+        }
+
+        .card {
+            background: linear-gradient(135deg, #111 0%, #1a1a1a 100%);
+            border: 1px solid #222;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 18px 24px;
+            background: #0f0f0f;
+            border-bottom: 1px solid #222;
+        }
+
+        .card-header h2 {
+            font-size: 16px;
+            font-weight: 500;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #00ff00;
+            box-shadow: 0 0 10px #00ff00;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.warning {
+            background: #ffaa00;
+            box-shadow: 0 0 10px #ffaa00;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .card-body {
+            padding: 24px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #1a1a1a;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .value {
+            color: #888;
+            font-size: 14px;
+        }
+
+        .value.active {
+            color: #00ff00;
+        }
+
+        .value.warning {
+            color: #ff4444;
+            animation: blink 1.5s infinite;
+        }
+
+        .module-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .module-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: #0a0a0a;
+            border: 1px solid #1a1a1a;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .module-item:hover {
+            border-color: #333;
+            background: #111;
+        }
+
+        .module-icon {
+            color: #333;
+            font-size: 20px;
+        }
+
+        .module-name {
+            flex: 1;
+            color: #ccc;
+            font-size: 14px;
+        }
+
+        .module-status {
+            font-size: 12px;
+            padding: 4px 12px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .module-status.ready {
+            background: rgba(0, 255, 0, 0.1);
+            color: #00ff00;
+            border: 1px solid rgba(0, 255, 0, 0.3);
+        }
+
+        .module-status.locked {
+            background: rgba(255, 0, 0, 0.1);
+            color: #ff4444;
+            border: 1px solid rgba(255, 0, 0, 0.3);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 15px 30px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+            color: #00ff00;
+            border: 1px solid #00ff00;
+        }
+
+        .btn-primary:hover {
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+            color: #888;
+            border: 1px solid #333;
+        }
+
+        .btn-secondary:hover {
+            border-color: #555;
+            color: #ccc;
+        }
+
+        footer {
+            margin-top: 50px;
+            text-align: center;
+            padding-top: 30px;
+            border-top: 1px solid #222;
+        }
+
+        .censored-text {
+            font-size: 12px;
+            color: #333;
+            letter-spacing: 5px;
+        }
+
+        @media (max-width: 600px) {
+            .glitch {
+                font-size: 32px;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .subtitle {
+                letter-spacing: 5px;
+                font-size: 12px;
+            }
+        }
+    </style>
 </head>
 <body>
     <div id="loading-overlay">
         <div class="loading-container">
-            <img src="{{ url_for('static', path='/images/loading.gif') }}" alt="Loading" class="loading-gif">
+            <img src="/static/images/loading.gif" alt="Loading" class="loading-gif">
             <p class="loading-text">Loading...</p>
         </div>
     </div>
