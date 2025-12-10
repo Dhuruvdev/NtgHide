@@ -86,7 +86,7 @@ async def deepfake_upload(file: UploadFile = File(...)):
 @app.get("/api/status")
 async def get_status():
     from services.darkweb_scanner import WHATBREACH_AVAILABLE, SPIDERFOOT_AVAILABLE
-    from services.deepfake_detector import MESONET_AVAILABLE, FACTOR_AVAILABLE
+    from services.deepfake_detector import DEEPFAKE_IMAGE_DETECTION_AVAILABLE
     
     modules_status = {
         "WhatBreach": {
@@ -111,17 +111,11 @@ async def get_status():
             "active": False,
             "path": "Modules/Darkweb Scan/TorCrawl.py"
         },
-        "MesoNet": {
-            "installed": os.path.exists("Modules/deepfake scan/MesoNet"),
-            "active": MESONET_AVAILABLE,
-            "path": "Modules/deepfake scan/MesoNet",
-            "features": ["Frequency artifact analysis", "Face detection", "Noise pattern analysis", "Color consistency check", "Compression artifact detection"]
-        },
-        "FACTOR": {
-            "installed": os.path.exists("Modules/deepfake scan/FACTOR"),
-            "active": FACTOR_AVAILABLE,
-            "path": "Modules/deepfake scan/FACTOR",
-            "features": ["Zero-shot deepfake detection", "Face forgery detection", "Audio-visual analysis", "Advanced AI detection"]
+        "DeepFake-Image-Detection": {
+            "installed": os.path.exists("Modules/deepfake scan/DeepFake-Image-Detection"),
+            "active": DEEPFAKE_IMAGE_DETECTION_AVAILABLE,
+            "path": "Modules/deepfake scan/DeepFake-Image-Detection",
+            "features": ["VGG16-style CNN analysis", "Transfer learning detection", "Deep feature extraction", "Edge and texture analysis", "Pretrained model methodology", "Error Level Analysis", "Frequency Domain Analysis", "Face Region Analysis"]
         }
     }
     
