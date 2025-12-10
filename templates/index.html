@@ -82,14 +82,19 @@
     </div>
 
     <script>
-        window.addEventListener('load', function() {
+        document.addEventListener('DOMContentLoaded', function() {
+            var loadingOverlay = document.getElementById('loading-overlay');
+            var mainContent = document.getElementById('main-content');
+            
             setTimeout(function() {
-                document.getElementById('loading-overlay').classList.add('fade-out');
-                document.getElementById('main-content').classList.remove('hidden');
+                loadingOverlay.classList.add('fade-out');
+                mainContent.classList.remove('hidden');
+                mainContent.classList.add('visible');
+                
                 setTimeout(function() {
-                    document.getElementById('loading-overlay').style.display = 'none';
+                    loadingOverlay.style.display = 'none';
                 }, 500);
-            }, 2000);
+            }, 1500);
         });
     </script>
 </body>

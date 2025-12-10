@@ -54,11 +54,15 @@ body {
 }
 
 .hidden {
+    display: none !important;
+}
+
+#main-content {
     opacity: 0;
     transition: opacity 0.5s ease;
 }
 
-#main-content:not(.hidden) {
+#main-content.visible {
     opacity: 1;
 }
 
