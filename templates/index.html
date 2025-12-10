@@ -637,6 +637,171 @@
         .error-msg { color: #ff4444; }
         .clear-msg { color: #00ff00; }
 
+        .api-notice {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 15px;
+            background: rgba(100, 100, 255, 0.1);
+            border: 1px solid rgba(100, 100, 255, 0.3);
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 12px;
+            color: #6666ff;
+        }
+
+        .notice-icon { font-size: 16px; }
+
+        .exposed-types {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 12px;
+            align-items: center;
+        }
+
+        .exposed-label {
+            color: #888;
+            font-size: 11px;
+            margin-right: 5px;
+        }
+
+        .data-type-tag {
+            padding: 3px 8px;
+            background: rgba(255, 68, 68, 0.15);
+            border: 1px solid rgba(255, 68, 68, 0.3);
+            border-radius: 3px;
+            font-size: 10px;
+            color: #ff6666;
+        }
+
+        .data-type-tag.more {
+            background: rgba(100, 100, 100, 0.2);
+            border-color: rgba(100, 100, 100, 0.3);
+            color: #888;
+        }
+
+        .breaches-section {
+            margin-bottom: 20px;
+        }
+
+        .breach-card {
+            padding: 15px;
+            margin-bottom: 12px;
+            background: #111;
+            border-radius: 6px;
+            border-left: 4px solid #444;
+        }
+
+        .breach-card.threat-critical { border-left-color: #ff0000; background: rgba(255, 0, 0, 0.05); }
+        .breach-card.threat-high { border-left-color: #ff4444; background: rgba(255, 68, 68, 0.05); }
+        .breach-card.threat-medium { border-left-color: #ffaa00; background: rgba(255, 170, 0, 0.05); }
+        .breach-card.threat-low { border-left-color: #6666ff; background: rgba(100, 100, 255, 0.05); }
+
+        .breach-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .breach-name-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .breach-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .verified-badge {
+            padding: 2px 8px;
+            background: rgba(0, 255, 0, 0.15);
+            border: 1px solid rgba(0, 255, 0, 0.3);
+            border-radius: 3px;
+            font-size: 9px;
+            color: #00ff00;
+            font-weight: bold;
+        }
+
+        .breach-threat {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .breach-threat.threat-critical { background: rgba(255, 0, 0, 0.2); color: #ff0000; }
+        .breach-threat.threat-high { background: rgba(255, 68, 68, 0.2); color: #ff4444; }
+        .breach-threat.threat-medium { background: rgba(255, 170, 0, 0.2); color: #ffaa00; }
+        .breach-threat.threat-low { background: rgba(100, 100, 255, 0.2); color: #6666ff; }
+
+        .breach-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            color: #888;
+        }
+
+        .breach-domain { color: #00ff00; }
+        .breach-date { color: #aaa; }
+        .breach-records { color: #ffaa00; }
+
+        .breach-data-types {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .dt-label {
+            color: #666;
+            font-size: 11px;
+        }
+
+        .data-tag {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+        }
+
+        .data-tag.critical-data {
+            background: rgba(255, 0, 0, 0.2);
+            color: #ff4444;
+            border: 1px solid rgba(255, 0, 0, 0.3);
+        }
+
+        .data-tag.high-data {
+            background: rgba(255, 170, 0, 0.15);
+            color: #ffaa00;
+            border: 1px solid rgba(255, 170, 0, 0.2);
+        }
+
+        .data-tag.medium-data {
+            background: rgba(100, 100, 100, 0.2);
+            color: #aaa;
+            border: 1px solid rgba(100, 100, 100, 0.3);
+        }
+
+        .breach-desc {
+            font-size: 12px;
+            color: #777;
+            line-height: 1.5;
+            padding-top: 8px;
+            border-top: 1px solid #222;
+        }
+
+        .rec-icon {
+            font-size: 16px;
+        }
+
         .scanning-animation {
             display: flex;
             flex-direction: column;
@@ -853,19 +1018,19 @@
             
             if (data.overall_threat_level === 'CRITICAL') {
                 threatClass = 'critical';
-                threatText = 'CRITICAL THREAT';
+                threatText = 'CRITICAL - ' + data.total_breaches + ' BREACH(ES)';
             } else if (data.overall_threat_level === 'HIGH') {
                 threatClass = 'error';
-                threatText = 'HIGH THREAT';
+                threatText = 'HIGH RISK - ' + data.total_breaches + ' BREACH(ES)';
             } else if (data.overall_threat_level === 'MEDIUM') {
                 threatClass = 'warning';
-                threatText = 'MEDIUM THREAT';
+                threatText = 'MEDIUM RISK - ' + data.total_breaches + ' BREACH(ES)';
             } else if (data.overall_threat_level === 'LOW') {
                 threatClass = 'low';
-                threatText = 'LOW THREAT';
-            } else if (data.total_found > 0) {
+                threatText = 'LOW RISK - ' + data.total_breaches + ' BREACH(ES)';
+            } else if (data.total_breaches > 0) {
                 threatClass = 'error';
-                threatText = 'BREACHES DETECTED';
+                threatText = data.total_breaches + ' BREACH(ES) FOUND';
             } else {
                 threatClass = 'success';
                 threatText = 'NO BREACHES FOUND';
@@ -876,11 +1041,18 @@
 
             var html = '';
             
-            if (data.overall_threat_level && data.overall_threat_level !== 'CLEAR') {
+            if (data.api_status && !data.api_status.hibp_configured) {
+                html += '<div class="api-notice">';
+                html += '<span class="notice-icon">&#9432;</span>';
+                html += '<span>For complete results, add HIBP_API_KEY (haveibeenpwned.com/API/Key)</span>';
+                html += '</div>';
+            }
+            
+            if (data.total_breaches > 0) {
                 html += '<div class="threat-summary">';
                 html += '<div class="threat-header threat-' + data.overall_threat_level.toLowerCase() + '">';
                 html += '<span class="threat-icon">' + getThreatIcon(data.overall_threat_level) + '</span>';
-                html += '<span class="threat-title">Overall Threat Level: ' + data.overall_threat_level + '</span>';
+                html += '<span class="threat-title">Found in ' + data.total_breaches + ' Data Breach(es)</span>';
                 html += '</div>';
                 
                 var breakdown = data.summary.threat_breakdown;
@@ -890,14 +1062,67 @@
                 if (breakdown.MEDIUM > 0) html += '<span class="threat-badge medium">MEDIUM: ' + breakdown.MEDIUM + '</span>';
                 if (breakdown.LOW > 0) html += '<span class="threat-badge low">LOW: ' + breakdown.LOW + '</span>';
                 html += '</div>';
+                
+                if (data.summary.exposed_data_types && data.summary.exposed_data_types.length > 0) {
+                    html += '<div class="exposed-types">';
+                    html += '<span class="exposed-label">Exposed Data:</span>';
+                    data.summary.exposed_data_types.slice(0, 8).forEach(function(dtype) {
+                        html += '<span class="data-type-tag">' + dtype + '</span>';
+                    });
+                    if (data.summary.exposed_data_types.length > 8) {
+                        html += '<span class="data-type-tag more">+' + (data.summary.exposed_data_types.length - 8) + ' more</span>';
+                    }
+                    html += '</div>';
+                }
+                html += '</div>';
+            }
+            
+            if (data.breaches_by_source && data.breaches_by_source.length > 0) {
+                html += '<div class="breaches-section">';
+                html += '<div class="section-title">Confirmed Breach Sources</div>';
+                data.breaches_by_source.forEach(function(breach) {
+                    html += '<div class="breach-card threat-' + breach.threat_level.toLowerCase() + '">';
+                    html += '<div class="breach-header">';
+                    html += '<div class="breach-name-row">';
+                    html += '<span class="breach-name">' + breach.source_name + '</span>';
+                    if (breach.is_verified) {
+                        html += '<span class="verified-badge" title="Verified Breach">&#10003; VERIFIED</span>';
+                    }
+                    html += '</div>';
+                    html += '<span class="breach-threat threat-' + breach.threat_level.toLowerCase() + '">' + breach.threat_level + '</span>';
+                    html += '</div>';
+                    
+                    html += '<div class="breach-meta">';
+                    html += '<span class="breach-domain">' + breach.source_domain + '</span>';
+                    html += '<span class="breach-date">Breached: ' + breach.breach_date + '</span>';
+                    html += '<span class="breach-records">' + formatNumber(breach.records_affected) + ' records</span>';
+                    html += '</div>';
+                    
+                    if (breach.data_types && breach.data_types.length > 0) {
+                        html += '<div class="breach-data-types">';
+                        html += '<span class="dt-label">Exposed:</span>';
+                        breach.data_types.forEach(function(dt) {
+                            var dtClass = getDataTypeClass(dt);
+                            html += '<span class="data-tag ' + dtClass + '">' + dt + '</span>';
+                        });
+                        html += '</div>';
+                    }
+                    
+                    if (breach.description) {
+                        html += '<div class="breach-desc">' + breach.description + '</div>';
+                    }
+                    
+                    html += '</div>';
+                });
                 html += '</div>';
             }
             
             if (data.recommendations && data.recommendations.length > 0) {
                 html += '<div class="recommendations-section">';
-                html += '<div class="section-title">Recommendations</div>';
+                html += '<div class="section-title">Security Recommendations</div>';
                 data.recommendations.forEach(function(rec) {
                     html += '<div class="recommendation-item priority-' + rec.priority.toLowerCase() + '">';
+                    if (rec.icon) html += '<span class="rec-icon">' + rec.icon + '</span>';
                     html += '<span class="rec-priority">' + rec.priority + '</span>';
                     html += '<span class="rec-action">' + rec.action + '</span>';
                     html += '</div>';
@@ -905,52 +1130,40 @@
                 html += '</div>';
             }
             
-            if (data.classified_findings && Object.keys(data.classified_findings).length > 0) {
-                html += '<div class="findings-section">';
-                html += '<div class="section-title">Classified Findings</div>';
-                for (var category in data.classified_findings) {
-                    html += '<div class="category-group">';
-                    html += '<div class="category-header">' + category + '</div>';
-                    data.classified_findings[category].forEach(function(finding) {
-                        html += '<div class="finding-item threat-' + finding.threat_level.toLowerCase() + '">';
-                        html += '<div class="finding-header">';
-                        html += '<span class="finding-threat">' + finding.threat_level + '</span>';
-                        html += '<span class="finding-source">via ' + finding.source + '</span>';
-                        html += '</div>';
-                        html += '<div class="finding-desc">' + finding.description + '</div>';
-                        html += '</div>';
-                    });
-                    html += '</div>';
-                }
-                html += '</div>';
-            }
-            
             html += '<div class="sources-section">';
-            html += '<div class="section-title">Source Results</div>';
-            data.sources.forEach(function(source) {
+            html += '<div class="section-title">Databases Checked</div>';
+            data.sources_checked.forEach(function(source) {
                 var statusClass = source.error ? 'error' : (source.found ? 'found' : 'clear');
-                var statusText = source.error ? 'ERROR' : (source.found ? 'FOUND' : 'CLEAR');
+                var statusText = source.error ? 'ERROR' : (source.found ? source.breach_count + ' FOUND' : 'CLEAR');
                 
                 html += '<div class="result-item">';
                 html += '<div class="result-source">';
                 html += '<span class="result-source-name">' + source.source + '</span>';
                 html += '<span class="result-source-status ' + statusClass + '">' + statusText + '</span>';
                 html += '</div>';
-                html += '<div class="result-details">';
-                
                 if (source.error) {
-                    html += '<p class="error-msg">' + source.error + '</p>';
-                } else if (source.found && source.classified_results && source.classified_results.length > 0) {
-                    html += '<p>Found ' + source.classified_results.length + ' classified finding(s)</p>';
-                } else if (!source.found) {
-                    html += '<p class="clear-msg">No data found for this query.</p>';
+                    html += '<div class="result-details"><p class="error-msg">' + source.error + '</p></div>';
                 }
-                
-                html += '</div></div>';
+                html += '</div>';
             });
             html += '</div>';
 
             resultsBody.innerHTML = html;
+        }
+        
+        function formatNumber(num) {
+            if (num >= 1000000000) return (num / 1000000000).toFixed(1) + 'B';
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num.toString();
+        }
+        
+        function getDataTypeClass(dataType) {
+            var dt = dataType.toLowerCase();
+            if (dt.includes('password')) return 'critical-data';
+            if (dt.includes('credit') || dt.includes('bank') || dt.includes('financial')) return 'critical-data';
+            if (dt.includes('email') || dt.includes('phone') || dt.includes('address')) return 'high-data';
+            return 'medium-data';
         }
         
         function getThreatIcon(level) {
