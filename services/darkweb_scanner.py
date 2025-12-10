@@ -41,18 +41,23 @@ class H8MailScanner:
             
             if os.path.exists(self.module_path) and os.listdir(self.module_path):
                 process = await asyncio.create_subprocess_exec(
-                    "python", "-m", "h8mail", "-t", email,
+                    "python", "-m", "h8mail", "-t", email, "-j", "/tmp/h8mail_results.json",
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     cwd=self.module_path
                 )
                 stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60)
                 
+                output = ""
                 if stdout:
                     output = stdout.decode()
-                    if "breach" in output.lower() or "found" in output.lower():
+                if stderr:
+                    output += stderr.decode()
+                    
+                if output.strip():
+                    if "breach" in output.lower() or "found" in output.lower() or "password" in output.lower():
                         found = True
-                        results.append({"raw_output": output})
+                    results.append({"raw_output": output})
             else:
                 return ScanResult(
                     source="h8mail",
@@ -97,18 +102,29 @@ class TorCrawlScanner:
 
             if os.path.exists(self.module_path) and os.listdir(self.module_path):
                 process = await asyncio.create_subprocess_exec(
-                    "python", "torcrawl.py", "-s", query,
+                    "python", "torcrawl.py", 
+                    "-v",
+                    "-u", f"https://ahmia.fi/search/?q={query}",
+                    "-c",
+                    "-d", "1",
+                    "-e",
+                    "-y", "1",
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     cwd=self.module_path
                 )
                 stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=120)
                 
+                output = ""
                 if stdout:
                     output = stdout.decode()
-                    if output.strip():
+                if stderr:
+                    output += stderr.decode()
+                    
+                if output.strip():
+                    if query.lower() in output.lower() or "found" in output.lower():
                         found = True
-                        results.append({"raw_output": output})
+                    results.append({"raw_output": output, "search_url": f"https://ahmia.fi/search/?q={query}"})
             else:
                 return ScanResult(
                     source="TorCrawl",
@@ -237,7 +253,10 @@ class DarkwebScannerService:
                 combined_results["sources"].append(result.to_dict())
                 if result.found:
                     combined_results["total_found"] += 1
-                    combined_results["summary"]["breaches_detected"] = True
+                    if result.source in ["h8mail", "WhatBreach"]:
+                        combined_results["summary"]["breaches_detected"] = True
+                    if result.source == "TorCrawl":
+                        combined_results["summary"]["darkweb_mentions"] = True
         
         if combined_results["total_found"] > 0:
             combined_results["summary"]["data_exposed"] = True

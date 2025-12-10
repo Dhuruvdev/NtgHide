@@ -1,10 +1,11 @@
 from fastapi import FastAPI, Request, UploadFile, File, Form
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from typing import Optional
 import asyncio
+import os
 
 from services.darkweb_scanner import darkweb_service
 from services.deepfake_detector import deepfake_service
@@ -12,6 +13,14 @@ from services.deepfake_detector import deepfake_service
 app = FastAPI()
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    icon_path = "generated-icon.png"
+    if os.path.exists(icon_path):
+        return FileResponse(icon_path)
+    return JSONResponse(status_code=404, content={"detail": "Not found"})
 
 templates = Jinja2Templates(directory="templates")
 
