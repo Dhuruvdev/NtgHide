@@ -5,10 +5,61 @@ import io
 from typing import Dict, Any, Tuple, List
 import os
 
+def convert_numpy_types(obj):
+    if isinstance(obj, dict):
+        return {k: convert_numpy_types(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(v) for v in obj]
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
+
+MESONET_MODEL_AVAILABLE = False
+meso4_classifier = None
+meso_inception_classifier = None
+
+try:
+    import tensorflow as tf
+    tf.get_logger().setLevel('ERROR')
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    
+    from classifiers import Meso4, MesoInception4
+    
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    weights_path_meso4 = os.path.join(base_path, 'weights', 'Meso4_DF.h5')
+    weights_path_inception = os.path.join(base_path, 'weights', 'MesoInception_DF.h5')
+    
+    if os.path.exists(weights_path_meso4):
+        meso4_classifier = Meso4()
+        meso4_classifier.load(weights_path_meso4)
+        MESONET_MODEL_AVAILABLE = True
+        print("MesoNet Meso4 model loaded successfully")
+    
+    if os.path.exists(weights_path_inception):
+        meso_inception_classifier = MesoInception4()
+        meso_inception_classifier.load(weights_path_inception)
+        print("MesoNet MesoInception4 model loaded successfully")
+        
+except ImportError as e:
+    print(f"TensorFlow/Keras not available: {e}")
+except Exception as e:
+    print(f"Error loading MesoNet models: {e}")
+
+IMGWIDTH = 256
+
 class MesoNetDetector:
     def __init__(self):
         self.face_cascade = None
         self._load_face_detector()
+        self.meso4 = meso4_classifier
+        self.meso_inception = meso_inception_classifier
+        self.model_available = MESONET_MODEL_AVAILABLE
     
     def _load_face_detector(self):
         cascade_paths = [
@@ -30,201 +81,88 @@ class MesoNetDetector:
         faces = self.face_cascade.detectMultiScale(gray, 1.1, 4)
         return [(x, y, w, h) for (x, y, w, h) in faces]
     
-    def analyze_frequency_artifacts(self, image: np.ndarray) -> Tuple[float, Dict]:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
-        f_transform = np.fft.fft2(gray)
-        f_shift = np.fft.fftshift(f_transform)
-        magnitude_spectrum = 20 * np.log(np.abs(f_shift) + 1)
+    def preprocess_image(self, image: np.ndarray) -> np.ndarray:
+        if image.shape[0] != IMGWIDTH or image.shape[1] != IMGWIDTH:
+            image = cv2.resize(image, (IMGWIDTH, IMGWIDTH))
         
-        h, w = magnitude_spectrum.shape
-        center_y, center_x = h // 2, w // 2
+        if len(image.shape) == 2:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        elif image.shape[2] == 4:
+            image = cv2.cvtColor(image, cv2.COLOR_BGRA2RGB)
+        elif image.shape[2] == 3:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         
-        high_freq_region = magnitude_spectrum[
-            max(0, center_y - h//4):min(h, center_y + h//4),
-            max(0, center_x - w//4):min(w, center_x + w//4)
-        ]
+        image = image.astype(np.float32) / 255.0
+        image = np.expand_dims(image, axis=0)
         
-        high_freq_mean = np.mean(high_freq_region)
-        high_freq_std = np.std(high_freq_region)
-        
-        outer_mask = np.ones_like(magnitude_spectrum, dtype=bool)
-        outer_mask[max(0, center_y - h//4):min(h, center_y + h//4),
-                   max(0, center_x - w//4):min(w, center_x + w//4)] = False
-        outer_freq_mean = np.mean(magnitude_spectrum[outer_mask])
-        
-        freq_ratio = outer_freq_mean / (high_freq_mean + 1e-10)
-        
-        gan_score = 0.0
-        if freq_ratio > 0.8:
-            gan_score = min((freq_ratio - 0.8) * 2, 1.0)
-        if high_freq_std < 15:
-            gan_score += 0.15
-        
-        return gan_score, {
-            "high_freq_mean": float(high_freq_mean),
-            "high_freq_std": float(high_freq_std),
-            "freq_ratio": float(freq_ratio)
-        }
+        return image
     
-    def analyze_noise_patterns(self, image: np.ndarray) -> Tuple[float, Dict]:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
+    def preprocess_face(self, image: np.ndarray, face_bbox: Tuple[int, int, int, int]) -> np.ndarray:
+        x, y, w, h = face_bbox
         
-        laplacian = cv2.Laplacian(gray, cv2.CV_64F)
-        laplacian_var = laplacian.var()
+        margin = int(0.3 * max(w, h))
+        x1 = max(0, x - margin)
+        y1 = max(0, y - margin)
+        x2 = min(image.shape[1], x + w + margin)
+        y2 = min(image.shape[0], y + h + margin)
         
-        noise = gray.astype(float) - cv2.GaussianBlur(gray, (5, 5), 0).astype(float)
-        noise_std = np.std(noise)
-        
-        sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
-        sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
-        edge_magnitude = np.sqrt(sobelx**2 + sobely**2)
-        edge_mean = np.mean(edge_magnitude)
-        
-        score = 0.0
-        
-        if laplacian_var < 50:
-            score += 0.2
-        elif laplacian_var > 500:
-            score += 0.1
-        
-        if noise_std < 2:
-            score += 0.2
-        elif noise_std > 20:
-            score += 0.15
-        
-        if edge_mean < 10:
-            score += 0.1
-        
-        return min(score, 1.0), {
-            "laplacian_variance": float(laplacian_var),
-            "noise_std": float(noise_std),
-            "edge_mean": float(edge_mean)
-        }
+        face_crop = image[y1:y2, x1:x2]
+        return self.preprocess_image(face_crop)
     
-    def analyze_color_consistency(self, image: np.ndarray) -> Tuple[float, Dict]:
-        if len(image.shape) != 3:
-            return 0.0, {"error": "Not a color image"}
+    def predict_with_mesonet(self, image: np.ndarray, faces: List[Tuple]) -> Tuple[float, Dict]:
+        if not self.model_available or self.meso4 is None:
+            return 0.0, {"error": "MesoNet model not available"}
         
-        lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
-        l, a, b = cv2.split(lab)
+        predictions = []
+        face_predictions = []
         
-        color_std_a = np.std(a)
-        color_std_b = np.std(b)
+        if faces:
+            for face_bbox in faces:
+                try:
+                    face_input = self.preprocess_face(image, face_bbox)
+                    
+                    meso4_pred = float(self.meso4.predict(face_input)[0][0])
+                    predictions.append(meso4_pred)
+                    
+                    inception_pred = None
+                    if self.meso_inception is not None:
+                        inception_pred = float(self.meso_inception.predict(face_input)[0][0])
+                        predictions.append(inception_pred)
+                    
+                    face_predictions.append({
+                        "face_bbox": {"x": int(face_bbox[0]), "y": int(face_bbox[1]), 
+                                      "width": int(face_bbox[2]), "height": int(face_bbox[3])},
+                        "meso4_score": meso4_pred,
+                        "meso_inception_score": inception_pred
+                    })
+                except Exception as e:
+                    face_predictions.append({
+                        "face_bbox": {"x": int(face_bbox[0]), "y": int(face_bbox[1]),
+                                      "width": int(face_bbox[2]), "height": int(face_bbox[3])},
+                        "error": str(e)
+                    })
+        else:
+            try:
+                full_input = self.preprocess_image(image)
+                meso4_pred = float(self.meso4.predict(full_input)[0][0])
+                predictions.append(meso4_pred)
+                
+                if self.meso_inception is not None:
+                    inception_pred = float(self.meso_inception.predict(full_input)[0][0])
+                    predictions.append(inception_pred)
+            except Exception as e:
+                return 0.0, {"error": str(e)}
         
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        h, s, v = cv2.split(hsv)
-        sat_mean = np.mean(s)
-        sat_std = np.std(s)
+        if predictions:
+            fake_score = 1.0 - np.mean(predictions)
+        else:
+            fake_score = 0.0
         
-        bgr_std = [np.std(image[:,:,i]) for i in range(3)]
-        channel_ratio = max(bgr_std) / (min(bgr_std) + 1e-10)
-        
-        score = 0.0
-        
-        if channel_ratio > 3:
-            score += 0.15
-        
-        if sat_std < 30:
-            score += 0.1
-        
-        if color_std_a < 10 or color_std_b < 10:
-            score += 0.15
-        
-        return min(score, 1.0), {
-            "color_std_a": float(color_std_a),
-            "color_std_b": float(color_std_b),
-            "saturation_mean": float(sat_mean),
-            "saturation_std": float(sat_std),
-            "channel_ratio": float(channel_ratio)
-        }
-    
-    def analyze_face_artifacts(self, image: np.ndarray, faces: List[Tuple]) -> Tuple[float, Dict]:
-        if not faces:
-            return 0.0, {"faces_detected": 0, "analysis": "No faces detected"}
-        
-        face_scores = []
-        face_details = []
-        
-        for (x, y, w, h) in faces:
-            face_roi = image[y:y+h, x:x+w]
-            if face_roi.size == 0:
-                continue
-            
-            face_gray = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY) if len(face_roi.shape) == 3 else face_roi
-            blur_score = cv2.Laplacian(face_gray, cv2.CV_64F).var()
-            
-            hsv_face = cv2.cvtColor(face_roi, cv2.COLOR_BGR2HSV)
-            skin_lower = np.array([0, 20, 70])
-            skin_upper = np.array([20, 255, 255])
-            skin_mask = cv2.inRange(hsv_face, skin_lower, skin_upper)
-            skin_ratio = np.sum(skin_mask > 0) / (w * h)
-            
-            sobelx = cv2.Sobel(face_gray, cv2.CV_64F, 1, 0, ksize=3)
-            sobely = cv2.Sobel(face_gray, cv2.CV_64F, 0, 1, ksize=3)
-            edge_consistency = np.std(np.sqrt(sobelx**2 + sobely**2))
-            
-            face_score = 0.0
-            
-            if blur_score < 30:
-                face_score += 0.2
-            
-            if skin_ratio < 0.1 or skin_ratio > 0.9:
-                face_score += 0.15
-            
-            if edge_consistency < 15:
-                face_score += 0.15
-            
-            face_scores.append(face_score)
-            face_details.append({
-                "position": {"x": int(x), "y": int(y), "width": int(w), "height": int(h)},
-                "blur_score": float(blur_score),
-                "skin_ratio": float(skin_ratio),
-                "edge_consistency": float(edge_consistency),
-                "artifact_score": float(face_score)
-            })
-        
-        avg_score = np.mean(face_scores) if face_scores else 0.0
-        
-        return float(avg_score), {
-            "faces_detected": len(faces),
-            "face_analysis": face_details
-        }
-    
-    def analyze_compression_artifacts(self, image: np.ndarray) -> Tuple[float, Dict]:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
-        
-        block_size = 8
-        h, w = gray.shape
-        h_blocks = h // block_size
-        w_blocks = w // block_size
-        
-        if h_blocks < 2 or w_blocks < 2:
-            return 0.0, {"error": "Image too small for block analysis"}
-        
-        block_means = []
-        for i in range(h_blocks):
-            for j in range(w_blocks):
-                block = gray[i*block_size:(i+1)*block_size, j*block_size:(j+1)*block_size]
-                block_means.append(np.mean(block))
-        
-        block_std = np.std(block_means)
-        
-        edges = cv2.Canny(gray, 50, 150)
-        h_edges = np.sum(edges[::block_size, :]) 
-        v_edges = np.sum(edges[:, ::block_size])
-        total_edges = np.sum(edges)
-        
-        grid_ratio = (h_edges + v_edges) / (total_edges + 1e-10)
-        
-        score = 0.0
-        if grid_ratio > 0.2:
-            score += 0.1
-        if block_std < 20:
-            score += 0.15
-        
-        return min(score, 1.0), {
-            "block_std": float(block_std),
-            "grid_edge_ratio": float(grid_ratio)
+        return fake_score, {
+            "faces_analyzed": len(faces) if faces else 1,
+            "face_predictions": face_predictions,
+            "average_authenticity_score": float(np.mean(predictions)) if predictions else 0.0,
+            "model_used": "MesoNet (Meso4 + MesoInception4)"
         }
     
     def analyze_image(self, image_data: bytes) -> Dict[str, Any]:
@@ -246,89 +184,51 @@ class MesoNetDetector:
             
             faces = self.detect_faces(image)
             
-            freq_score, freq_details = self.analyze_frequency_artifacts(image)
-            noise_score, noise_details = self.analyze_noise_patterns(image)
-            color_score, color_details = self.analyze_color_consistency(image)
-            face_score, face_details = self.analyze_face_artifacts(image, faces)
-            compression_score, compression_details = self.analyze_compression_artifacts(image)
-            
-            weights = {
-                "frequency": 0.25,
-                "noise": 0.20,
-                "color": 0.15,
-                "face": 0.30,
-                "compression": 0.10
-            }
-            
-            weighted_score = (
-                freq_score * weights["frequency"] +
-                noise_score * weights["noise"] +
-                color_score * weights["color"] +
-                face_score * weights["face"] +
-                compression_score * weights["compression"]
-            )
-            
-            final_confidence = min(max(weighted_score, 0.0), 1.0)
-            
-            is_deepfake = final_confidence > 0.35
-            
-            if final_confidence < 0.2:
-                verdict = "LIKELY AUTHENTIC"
-                risk_level = "LOW"
-            elif final_confidence < 0.35:
-                verdict = "POSSIBLY AUTHENTIC"
-                risk_level = "MEDIUM-LOW"
-            elif final_confidence < 0.5:
-                verdict = "SUSPICIOUS"
-                risk_level = "MEDIUM"
-            elif final_confidence < 0.7:
-                verdict = "LIKELY DEEPFAKE"
-                risk_level = "HIGH"
-            else:
-                verdict = "HIGHLY LIKELY DEEPFAKE"
-                risk_level = "VERY HIGH"
-            
-            return {
-                "success": True,
-                "is_deepfake": is_deepfake,
-                "confidence": round(final_confidence * 100, 2),
-                "verdict": verdict,
-                "risk_level": risk_level,
-                "analysis_method": "MesoNet-style CNN Analysis",
-                "component_scores": {
-                    "frequency_analysis": {
-                        "score": round(freq_score * 100, 2),
-                        "weight": weights["frequency"],
-                        "details": freq_details
-                    },
-                    "noise_pattern_analysis": {
-                        "score": round(noise_score * 100, 2),
-                        "weight": weights["noise"],
-                        "details": noise_details
-                    },
-                    "color_consistency": {
-                        "score": round(color_score * 100, 2),
-                        "weight": weights["color"],
-                        "details": color_details
-                    },
-                    "face_artifact_analysis": {
-                        "score": round(face_score * 100, 2),
-                        "weight": weights["face"],
-                        "details": face_details
-                    },
-                    "compression_analysis": {
-                        "score": round(compression_score * 100, 2),
-                        "weight": weights["compression"],
-                        "details": compression_details
+            if self.model_available and self.meso4 is not None:
+                mesonet_score, mesonet_details = self.predict_with_mesonet(image, faces)
+                
+                confidence = mesonet_score
+                is_deepfake = confidence > 0.5
+                
+                if confidence < 0.3:
+                    verdict = "LIKELY AUTHENTIC"
+                    risk_level = "LOW"
+                elif confidence < 0.5:
+                    verdict = "POSSIBLY AUTHENTIC"
+                    risk_level = "MEDIUM-LOW"
+                elif confidence < 0.7:
+                    verdict = "SUSPICIOUS - POSSIBLE DEEPFAKE"
+                    risk_level = "MEDIUM-HIGH"
+                elif confidence < 0.85:
+                    verdict = "LIKELY DEEPFAKE"
+                    risk_level = "HIGH"
+                else:
+                    verdict = "HIGHLY LIKELY DEEPFAKE"
+                    risk_level = "VERY HIGH"
+                
+                result = {
+                    "success": True,
+                    "is_deepfake": bool(is_deepfake),
+                    "confidence": float(round(confidence * 100, 2)),
+                    "verdict": verdict,
+                    "risk_level": risk_level,
+                    "analysis_method": "MesoNet Pre-trained Model (Meso4 + MesoInception4)",
+                    "mesonet_analysis": mesonet_details,
+                    "image_info": {
+                        "width": int(image.shape[1]),
+                        "height": int(image.shape[0]),
+                        "channels": int(image.shape[2]) if len(image.shape) == 3 else 1,
+                        "faces_detected": int(len(faces))
                     }
-                },
-                "image_info": {
-                    "width": image.shape[1],
-                    "height": image.shape[0],
-                    "channels": image.shape[2] if len(image.shape) == 3 else 1,
-                    "faces_detected": len(faces)
                 }
-            }
+                return convert_numpy_types(result)
+            else:
+                return {
+                    "success": False,
+                    "error": "MesoNet pre-trained model not available",
+                    "is_deepfake": None,
+                    "confidence": None
+                }
             
         except Exception as e:
             return {
