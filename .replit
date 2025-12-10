@@ -1,8 +1,9 @@
 entrypoint = "main.py"
-modules = ["python-3.11"]
+modules = ["web", "python-3.11"]
 
 [nix]
 channel = "stable-25_05"
+packages = ["libxcrypt"]
 
 [unitTest]
 language = "python3"
@@ -48,3 +49,7 @@ externalPort = 80
 [[ports]]
 localPort = 33711
 externalPort = 3000
+
+[[ports]]
+localPort = 44277
+externalPort = 3001
