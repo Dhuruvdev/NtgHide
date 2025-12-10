@@ -450,6 +450,222 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        .results-status.critical {
+            background: rgba(255, 0, 0, 0.2);
+            color: #ff0000;
+            border: 1px solid rgba(255, 0, 0, 0.5);
+            font-weight: bold;
+        }
+
+        .results-status.warning {
+            background: rgba(255, 170, 0, 0.1);
+            color: #ffaa00;
+            border: 1px solid rgba(255, 170, 0, 0.3);
+        }
+
+        .results-status.low {
+            background: rgba(100, 100, 255, 0.1);
+            color: #6666ff;
+            border: 1px solid rgba(100, 100, 255, 0.3);
+        }
+
+        .threat-summary {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #0a0a0a;
+            border-radius: 6px;
+            border: 1px solid #222;
+        }
+
+        .threat-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .threat-header.threat-critical { color: #ff0000; }
+        .threat-header.threat-high { color: #ff4444; }
+        .threat-header.threat-medium { color: #ffaa00; }
+        .threat-header.threat-low { color: #6666ff; }
+
+        .threat-icon { font-size: 20px; }
+
+        .threat-breakdown {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .threat-badge {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .threat-badge.critical { background: rgba(255, 0, 0, 0.2); color: #ff0000; }
+        .threat-badge.high { background: rgba(255, 68, 68, 0.2); color: #ff4444; }
+        .threat-badge.medium { background: rgba(255, 170, 0, 0.2); color: #ffaa00; }
+        .threat-badge.low { background: rgba(100, 100, 255, 0.2); color: #6666ff; }
+
+        .section-title {
+            color: #888;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #222;
+        }
+
+        .recommendations-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #0a0a0a;
+            border-radius: 6px;
+            border: 1px solid #222;
+        }
+
+        .recommendation-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #111;
+            border-radius: 4px;
+            border-left: 3px solid #444;
+        }
+
+        .recommendation-item.priority-critical { border-left-color: #ff0000; }
+        .recommendation-item.priority-high { border-left-color: #ff4444; }
+        .recommendation-item.priority-medium { border-left-color: #ffaa00; }
+
+        .rec-priority {
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .priority-critical .rec-priority { background: rgba(255, 0, 0, 0.2); color: #ff0000; }
+        .priority-high .rec-priority { background: rgba(255, 68, 68, 0.2); color: #ff4444; }
+        .priority-medium .rec-priority { background: rgba(255, 170, 0, 0.2); color: #ffaa00; }
+
+        .rec-action {
+            color: #aaa;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .findings-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #0a0a0a;
+            border-radius: 6px;
+            border: 1px solid #222;
+        }
+
+        .category-group {
+            margin-bottom: 15px;
+        }
+
+        .category-header {
+            color: #00ff00;
+            font-size: 13px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            padding: 5px 10px;
+            background: rgba(0, 255, 0, 0.1);
+            border-radius: 4px;
+        }
+
+        .finding-item {
+            padding: 10px;
+            margin-bottom: 6px;
+            background: #111;
+            border-radius: 4px;
+            border-left: 3px solid #444;
+        }
+
+        .finding-item.threat-critical { border-left-color: #ff0000; }
+        .finding-item.threat-high { border-left-color: #ff4444; }
+        .finding-item.threat-medium { border-left-color: #ffaa00; }
+        .finding-item.threat-low { border-left-color: #6666ff; }
+
+        .finding-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+
+        .finding-threat {
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .threat-critical .finding-threat { background: rgba(255, 0, 0, 0.2); color: #ff0000; }
+        .threat-high .finding-threat { background: rgba(255, 68, 68, 0.2); color: #ff4444; }
+        .threat-medium .finding-threat { background: rgba(255, 170, 0, 0.2); color: #ffaa00; }
+        .threat-low .finding-threat { background: rgba(100, 100, 255, 0.2); color: #6666ff; }
+
+        .finding-source {
+            color: #666;
+            font-size: 11px;
+        }
+
+        .finding-desc {
+            color: #aaa;
+            font-size: 12px;
+        }
+
+        .sources-section {
+            padding: 15px;
+            background: #0a0a0a;
+            border-radius: 6px;
+            border: 1px solid #222;
+        }
+
+        .error-msg { color: #ff4444; }
+        .clear-msg { color: #00ff00; }
+
+        .scanning-animation {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .scanning-gif {
+            width: 120px;
+            height: 120px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 2px solid #333;
+        }
+
+        .scanning-text {
+            color: #00ff00;
+            font-size: 14px;
+            letter-spacing: 2px;
+            animation: blink 1s infinite;
+        }
+
+        .scanning-subtext {
+            color: #666;
+            font-size: 12px;
+            margin-top: 8px;
+        }
     </style>
 </head>
 <body>
@@ -598,7 +814,7 @@
             resultsSection.classList.add('active');
             resultsStatus.className = 'results-status scanning';
             resultsStatus.textContent = 'Scanning...';
-            resultsBody.innerHTML = '<div class="result-item"><div class="result-details">Running scan across h8mail, TorCrawl, and WhatBreach...</div></div>';
+            resultsBody.innerHTML = '<div class="scanning-animation"><img src="/static/images/scanning.gif" alt="Scanning" class="scanning-gif"><div class="scanning-text">SCANNING DARK WEB...</div><div class="scanning-subtext">Checking h8mail, TorCrawl, and WhatBreach databases</div></div>';
 
             try {
                 const response = await fetch('/api/darkweb/scan', {
@@ -632,15 +848,85 @@
             var resultsStatus = document.getElementById('darkweb-results-status');
             var resultsBody = document.getElementById('darkweb-results-body');
 
-            if (data.total_found > 0) {
-                resultsStatus.className = 'results-status error';
-                resultsStatus.textContent = 'BREACHES DETECTED';
+            var threatClass = 'success';
+            var threatText = 'CLEAR';
+            
+            if (data.overall_threat_level === 'CRITICAL') {
+                threatClass = 'critical';
+                threatText = 'CRITICAL THREAT';
+            } else if (data.overall_threat_level === 'HIGH') {
+                threatClass = 'error';
+                threatText = 'HIGH THREAT';
+            } else if (data.overall_threat_level === 'MEDIUM') {
+                threatClass = 'warning';
+                threatText = 'MEDIUM THREAT';
+            } else if (data.overall_threat_level === 'LOW') {
+                threatClass = 'low';
+                threatText = 'LOW THREAT';
+            } else if (data.total_found > 0) {
+                threatClass = 'error';
+                threatText = 'BREACHES DETECTED';
             } else {
-                resultsStatus.className = 'results-status success';
-                resultsStatus.textContent = 'NO BREACHES FOUND';
+                threatClass = 'success';
+                threatText = 'NO BREACHES FOUND';
             }
+            
+            resultsStatus.className = 'results-status ' + threatClass;
+            resultsStatus.textContent = threatText;
 
             var html = '';
+            
+            if (data.overall_threat_level && data.overall_threat_level !== 'CLEAR') {
+                html += '<div class="threat-summary">';
+                html += '<div class="threat-header threat-' + data.overall_threat_level.toLowerCase() + '">';
+                html += '<span class="threat-icon">' + getThreatIcon(data.overall_threat_level) + '</span>';
+                html += '<span class="threat-title">Overall Threat Level: ' + data.overall_threat_level + '</span>';
+                html += '</div>';
+                
+                var breakdown = data.summary.threat_breakdown;
+                html += '<div class="threat-breakdown">';
+                if (breakdown.CRITICAL > 0) html += '<span class="threat-badge critical">CRITICAL: ' + breakdown.CRITICAL + '</span>';
+                if (breakdown.HIGH > 0) html += '<span class="threat-badge high">HIGH: ' + breakdown.HIGH + '</span>';
+                if (breakdown.MEDIUM > 0) html += '<span class="threat-badge medium">MEDIUM: ' + breakdown.MEDIUM + '</span>';
+                if (breakdown.LOW > 0) html += '<span class="threat-badge low">LOW: ' + breakdown.LOW + '</span>';
+                html += '</div>';
+                html += '</div>';
+            }
+            
+            if (data.recommendations && data.recommendations.length > 0) {
+                html += '<div class="recommendations-section">';
+                html += '<div class="section-title">Recommendations</div>';
+                data.recommendations.forEach(function(rec) {
+                    html += '<div class="recommendation-item priority-' + rec.priority.toLowerCase() + '">';
+                    html += '<span class="rec-priority">' + rec.priority + '</span>';
+                    html += '<span class="rec-action">' + rec.action + '</span>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+            
+            if (data.classified_findings && Object.keys(data.classified_findings).length > 0) {
+                html += '<div class="findings-section">';
+                html += '<div class="section-title">Classified Findings</div>';
+                for (var category in data.classified_findings) {
+                    html += '<div class="category-group">';
+                    html += '<div class="category-header">' + category + '</div>';
+                    data.classified_findings[category].forEach(function(finding) {
+                        html += '<div class="finding-item threat-' + finding.threat_level.toLowerCase() + '">';
+                        html += '<div class="finding-header">';
+                        html += '<span class="finding-threat">' + finding.threat_level + '</span>';
+                        html += '<span class="finding-source">via ' + finding.source + '</span>';
+                        html += '</div>';
+                        html += '<div class="finding-desc">' + finding.description + '</div>';
+                        html += '</div>';
+                    });
+                    html += '</div>';
+                }
+                html += '</div>';
+            }
+            
+            html += '<div class="sources-section">';
+            html += '<div class="section-title">Source Results</div>';
             data.sources.forEach(function(source) {
                 var statusClass = source.error ? 'error' : (source.found ? 'found' : 'clear');
                 var statusText = source.error ? 'ERROR' : (source.found ? 'FOUND' : 'CLEAR');
@@ -653,17 +939,28 @@
                 html += '<div class="result-details">';
                 
                 if (source.error) {
-                    html += source.error;
-                } else if (source.found && source.data.length > 0) {
-                    html += '<pre>' + JSON.stringify(source.data, null, 2) + '</pre>';
-                } else {
-                    html += 'No data found for this query.';
+                    html += '<p class="error-msg">' + source.error + '</p>';
+                } else if (source.found && source.classified_results && source.classified_results.length > 0) {
+                    html += '<p>Found ' + source.classified_results.length + ' classified finding(s)</p>';
+                } else if (!source.found) {
+                    html += '<p class="clear-msg">No data found for this query.</p>';
                 }
                 
                 html += '</div></div>';
             });
+            html += '</div>';
 
             resultsBody.innerHTML = html;
+        }
+        
+        function getThreatIcon(level) {
+            switch(level) {
+                case 'CRITICAL': return '&#9888;';
+                case 'HIGH': return '&#9888;';
+                case 'MEDIUM': return '&#9888;';
+                case 'LOW': return '&#8505;';
+                default: return '&#10003;';
+            }
         }
 
         async function scanDeepfake() {
@@ -682,7 +979,7 @@
             resultsSection.classList.add('active');
             resultsStatus.className = 'results-status scanning';
             resultsStatus.textContent = 'Analyzing...';
-            resultsBody.innerHTML = '<div class="result-item"><div class="result-details">Running FACTOR deepfake analysis...</div></div>';
+            resultsBody.innerHTML = '<div class="scanning-animation"><img src="/static/images/scanning.gif" alt="Analyzing" class="scanning-gif"><div class="scanning-text">ANALYZING MEDIA...</div><div class="scanning-subtext">Running FACTOR deepfake detection algorithm</div></div>';
 
             try {
                 var formData = new FormData();
