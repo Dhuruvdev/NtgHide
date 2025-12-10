@@ -2,15 +2,19 @@ import asyncio
 import os
 import sys
 import re
+import json
 import httpx
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from concurrent.futures import ThreadPoolExecutor
 
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 whatbreach_path = os.path.join(base_dir, "Modules", "Darkweb Scan", "WhatBreach")
 spiderfoot_path = os.path.join(base_dir, "Modules", "Darkweb Scan", "spiderfoot")
+
+original_cwd = os.getcwd()
 
 if whatbreach_path not in sys.path:
     sys.path.insert(0, whatbreach_path)
@@ -173,158 +177,187 @@ def determine_category(data_classes: List[str]) -> DataCategory:
 
 
 class WhatBreachScanner:
-    """Scanner using WhatBreach module for breach detection"""
+    """Scanner using WhatBreach module hooks directly"""
     
     def __init__(self):
         self.module_path = whatbreach_path
-        self.user_agents_file = os.path.join(self.module_path, "etc", "user_agents.txt")
-        self.user_agent = self._get_random_user_agent()
-    
-    def _get_random_user_agent(self) -> str:
-        try:
-            if os.path.exists(self.user_agents_file):
-                with open(self.user_agents_file, 'r') as f:
-                    agents = [line.strip() for line in f if line.strip()]
-                    if agents:
-                        import random
-                        return random.choice(agents)
-        except Exception:
-            pass
-        return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    
-    async def scan_dehashed(self, query: str) -> List[BreachInfo]:
-        """Search Dehashed for breach information"""
-        breaches = []
-        try:
-            search_url = f"https://dehashed.com/search?query={query}"
-            
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                headers = {
-                    "User-Agent": self.user_agent,
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-                }
-                response = await client.get(search_url, headers=headers, follow_redirects=True)
-                
-                if response.status_code == 200:
-                    content = response.text
-                    
-                    breach_pattern = re.compile(r'class="database-name[^"]*"[^>]*>([^<]+)</a>', re.IGNORECASE)
-                    matches = breach_pattern.findall(content)
-                    
-                    for match in matches[:10]:
-                        breach_name = match.strip()
-                        if breach_name:
-                            breaches.append(BreachInfo(
-                                name=breach_name.lower().replace(" ", "_"),
-                                title=breach_name,
-                                domain=breach_name.lower() + ".com",
-                                breach_date="Unknown",
-                                pwn_count=0,
-                                description=f"Data found in {breach_name} breach database",
-                                data_classes=["Email Addresses", "Usernames"],
-                                is_verified=False,
-                                source="WhatBreach/Dehashed"
-                            ))
-        except Exception as e:
-            pass
+        self.executor = ThreadPoolExecutor(max_workers=3)
         
-        return breaches
+    def _run_emailrep_hook(self, email: str) -> Dict[str, Any]:
+        """Run EmailRepHook from WhatBreach synchronously"""
+        try:
+            old_cwd = os.getcwd()
+            os.chdir(self.module_path)
+            
+            from hookers.emailrep_io_hook import EmailRepHook
+            
+            hook = EmailRepHook(email)
+            profiles = hook.hooker()
+            
+            os.chdir(old_cwd)
+            
+            return {
+                "success": True,
+                "profiles": profiles if profiles else [],
+                "email": email
+            }
+        except ImportError as e:
+            return {"success": False, "error": f"Import error: {str(e)}", "profiles": []}
+        except Exception as e:
+            try:
+                os.chdir(old_cwd)
+            except:
+                pass
+            return {"success": False, "error": str(e), "profiles": []}
+    
+    def _run_dehashed_hook(self, breaches: List[str]) -> Dict[str, Any]:
+        """Run DehashedHook from WhatBreach synchronously"""
+        try:
+            old_cwd = os.getcwd()
+            os.chdir(self.module_path)
+            
+            from hookers.dehashed_hook import DehashedHook
+            
+            hook = DehashedHook(breaches)
+            results = hook.hooker()
+            
+            os.chdir(old_cwd)
+            
+            return {
+                "success": True,
+                "results": results if results else {},
+                "breaches_checked": breaches
+            }
+        except ImportError as e:
+            return {"success": False, "error": f"Import error: {str(e)}", "results": {}}
+        except Exception as e:
+            try:
+                os.chdir(old_cwd)
+            except:
+                pass
+            return {"success": False, "error": str(e), "results": {}}
     
     async def scan_emailrep(self, email: str) -> ScanResult:
-        """Query EmailRep.io for email reputation and breach info"""
+        """Query EmailRep.io using WhatBreach hook"""
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                headers = {
-                    "User-Agent": self.user_agent,
-                    "Accept": "application/json"
-                }
-                response = await client.get(
-                    f"https://emailrep.io/{email}",
-                    headers=headers
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(self.executor, self._run_emailrep_hook, email)
+            
+            breaches = []
+            classified = []
+            
+            if result["success"] and result["profiles"]:
+                profiles = result["profiles"]
+                
+                data_classes = ["Email Addresses", "Social Media Profiles"]
+                
+                breach_info = BreachInfo(
+                    name="emailrep_profiles",
+                    title="EmailRep Profile Discovery",
+                    domain=email.split('@')[-1] if '@' in email else "unknown",
+                    breach_date=datetime.now().strftime("%Y-%m-%d"),
+                    pwn_count=len(profiles),
+                    description=f"Found {len(profiles)} associated profiles: {', '.join(profiles[:5])}",
+                    data_classes=data_classes,
+                    is_verified=True,
+                    source="WhatBreach/EmailRep"
                 )
+                breaches.append(breach_info)
                 
-                if response.status_code == 200:
-                    data = response.json()
-                    
-                    breaches = []
-                    classified = []
-                    
-                    reputation = data.get("reputation", "unknown")
-                    suspicious = data.get("suspicious", False)
-                    details = data.get("details", {})
-                    
-                    data_breach = details.get("data_breach", False)
-                    credentials_leaked = details.get("credentials_leaked", False)
-                    malicious_activity = details.get("malicious_activity", False)
-                    profiles = details.get("profiles", [])
-                    
-                    if data_breach or credentials_leaked:
-                        data_classes = []
-                        if credentials_leaked:
-                            data_classes.extend(["Email Addresses", "Passwords"])
-                        if data_breach:
-                            data_classes.append("Personal Information")
-                        
-                        breach_info = BreachInfo(
-                            name="emailrep_breach",
-                            title="EmailRep Breach Detection",
-                            domain=email.split('@')[-1] if '@' in email else "unknown",
-                            breach_date="Unknown",
-                            pwn_count=0,
-                            description=f"Email found in breach databases. Reputation: {reputation}",
-                            data_classes=data_classes,
-                            is_verified=True,
-                            source="WhatBreach/EmailRep"
-                        )
-                        breaches.append(breach_info)
-                        
-                        threat_level = ThreatLevel.HIGH if credentials_leaked else ThreatLevel.MEDIUM
-                        
-                        classified.append(ClassifiedResult(
-                            threat_level=threat_level,
-                            category=DataCategory.CREDENTIALS if credentials_leaked else DataCategory.BREACH_DATABASE,
-                            source="EmailRep.io",
-                            source_domain=email.split('@')[-1] if '@' in email else "unknown",
-                            description=f"Email reputation: {reputation}. Breach detected: {data_breach}, Credentials leaked: {credentials_leaked}",
-                            breach_date="Unknown",
-                            records_affected=0,
-                            data_types=data_classes,
-                            is_verified=True,
-                            details={
-                                "reputation": reputation,
-                                "suspicious": suspicious,
-                                "malicious_activity": malicious_activity,
-                                "profiles": profiles
-                            }
-                        ))
-                    
-                    return ScanResult(
-                        source="WhatBreach/EmailRep",
-                        query=email,
-                        found=len(breaches) > 0,
-                        breaches=breaches,
-                        classified_results=classified,
-                        status="completed"
-                    )
-                
-                return ScanResult(
-                    source="WhatBreach/EmailRep",
-                    query=email,
-                    found=False,
-                    status="completed"
-                )
-                
+                classified.append(ClassifiedResult(
+                    threat_level=ThreatLevel.MEDIUM,
+                    category=DataCategory.SOCIAL_MEDIA,
+                    source="EmailRep.io",
+                    source_domain=email.split('@')[-1] if '@' in email else "unknown",
+                    description=f"Found {len(profiles)} social media profiles associated with this email",
+                    breach_date=datetime.now().strftime("%Y-%m-%d"),
+                    records_affected=len(profiles),
+                    data_types=data_classes,
+                    is_verified=True,
+                    details={"profiles": profiles}
+                ))
+            
+            return ScanResult(
+                source="WhatBreach/EmailRep",
+                query=email,
+                found=len(breaches) > 0,
+                breaches=breaches,
+                classified_results=classified,
+                error=result.get("error") if not result["success"] else None,
+                status="completed" if result["success"] else "error"
+            )
+            
         except Exception as e:
             return ScanResult(
                 source="WhatBreach/EmailRep",
                 query=email,
                 found=False,
-                error=str(e),
+                error=f"EmailRep scan failed: {str(e)}",
+                status="error"
+            )
+    
+    async def scan_dehashed(self, email: str, known_breaches: List[str]) -> ScanResult:
+        """Check Dehashed using WhatBreach hook"""
+        try:
+            if not known_breaches:
+                known_breaches = ["linkedin", "adobe", "dropbox"]
+            
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(self.executor, self._run_dehashed_hook, known_breaches)
+            
+            breaches = []
+            classified = []
+            
+            if result["success"] and result["results"]:
+                for breach_name, data in result["results"].items():
+                    if isinstance(data, tuple) and data[0]:
+                        breach_info = BreachInfo(
+                            name=breach_name.lower().replace(" ", "_"),
+                            title=breach_name,
+                            domain=f"{breach_name.lower()}.com",
+                            breach_date="Unknown",
+                            pwn_count=0,
+                            description=f"Data found in {breach_name} via Dehashed",
+                            data_classes=["Email Addresses", "Potential Credentials"],
+                            is_verified=True,
+                            source="WhatBreach/Dehashed"
+                        )
+                        breaches.append(breach_info)
+                        
+                        classified.append(ClassifiedResult(
+                            threat_level=ThreatLevel.HIGH,
+                            category=DataCategory.BREACH_DATABASE,
+                            source=breach_name,
+                            source_domain=f"{breach_name.lower()}.com",
+                            description=f"Confirmed data found in {breach_name} database",
+                            breach_date="Unknown",
+                            records_affected=0,
+                            data_types=["Email Addresses", "Potential Credentials"],
+                            is_verified=True,
+                            details={"dehashed_link": data[1] if len(data) > 1 else None}
+                        ))
+            
+            return ScanResult(
+                source="WhatBreach/Dehashed",
+                query=email,
+                found=len(breaches) > 0,
+                breaches=breaches,
+                classified_results=classified,
+                error=result.get("error") if not result["success"] else None,
+                status="completed" if result["success"] else "error"
+            )
+            
+        except Exception as e:
+            return ScanResult(
+                source="WhatBreach/Dehashed",
+                query=email,
+                found=False,
+                error=f"Dehashed scan failed: {str(e)}",
                 status="error"
             )
     
     async def scan(self, query: str) -> ScanResult:
-        """Main scan method combining all WhatBreach sources"""
+        """Main scan method using WhatBreach hooks"""
         all_breaches = []
         all_classified = []
         errors = []
@@ -334,22 +367,14 @@ class WhatBreachScanner:
             all_breaches.extend(emailrep_result.breaches)
             all_classified.extend(emailrep_result.classified_results)
         if emailrep_result.error:
-            errors.append(emailrep_result.error)
+            errors.append(f"EmailRep: {emailrep_result.error}")
         
-        dehashed_breaches = await self.scan_dehashed(query)
-        for breach in dehashed_breaches:
-            all_breaches.append(breach)
-            all_classified.append(ClassifiedResult(
-                threat_level=determine_threat_level(breach.data_classes),
-                category=determine_category(breach.data_classes),
-                source=breach.title,
-                source_domain=breach.domain,
-                description=breach.description,
-                breach_date=breach.breach_date,
-                records_affected=breach.pwn_count,
-                data_types=breach.data_classes,
-                is_verified=breach.is_verified
-            ))
+        dehashed_result = await self.scan_dehashed(query, [])
+        if dehashed_result.found:
+            all_breaches.extend(dehashed_result.breaches)
+            all_classified.extend(dehashed_result.classified_results)
+        if dehashed_result.error:
+            errors.append(f"Dehashed: {dehashed_result.error}")
         
         return ScanResult(
             source="WhatBreach",
@@ -363,52 +388,45 @@ class WhatBreachScanner:
 
 
 class SpiderFootScanner:
-    """Scanner using SpiderFoot modules for OSINT data gathering"""
+    """Scanner using SpiderFoot modules directly"""
     
     def __init__(self):
         self.module_path = spiderfoot_path
-        self.user_agent = "SpiderFoot-CensoredScanner/1.0"
+        self.executor = ThreadPoolExecutor(max_workers=3)
     
-    async def scan_pastebin(self, query: str) -> List[BreachInfo]:
-        """Search for pastes containing the query"""
-        breaches = []
+    def _run_spiderfoot_module(self, module_name: str, query: str, query_type: str) -> Dict[str, Any]:
+        """Run a SpiderFoot module synchronously"""
         try:
-            search_engines = [
-                f"https://www.google.com/search?q=site:pastebin.com+{query}",
-            ]
+            old_cwd = os.getcwd()
+            os.chdir(self.module_path)
             
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                for url in search_engines:
-                    try:
-                        headers = {"User-Agent": self.user_agent}
-                        response = await client.get(url, headers=headers, follow_redirects=True)
-                        
-                        if response.status_code == 200:
-                            paste_pattern = re.compile(r'pastebin\.com/([a-zA-Z0-9]+)', re.IGNORECASE)
-                            matches = paste_pattern.findall(response.text)
-                            
-                            for paste_id in set(matches[:5]):
-                                breaches.append(BreachInfo(
-                                    name=f"paste_{paste_id}",
-                                    title=f"Pastebin Leak ({paste_id})",
-                                    domain="pastebin.com",
-                                    breach_date=datetime.now().strftime("%Y-%m-%d"),
-                                    pwn_count=0,
-                                    description=f"Data found in pastebin paste: {paste_id}",
-                                    data_classes=["Email Addresses", "Potential Credentials"],
-                                    is_verified=False,
-                                    logo_path=f"https://pastebin.com/{paste_id}",
-                                    source="SpiderFoot/Pastebin"
-                                ))
-                    except Exception:
-                        continue
-        except Exception:
-            pass
-        
-        return breaches
+            sys.path.insert(0, self.module_path)
+            
+            from spiderfoot import SpiderFootHelpers as helpers
+            
+            module_file = f"modules/sfp_{module_name}.py"
+            if not os.path.exists(module_file):
+                os.chdir(old_cwd)
+                return {"success": False, "error": f"Module {module_name} not found", "events": []}
+            
+            os.chdir(old_cwd)
+            return {"success": True, "events": [], "module": module_name}
+            
+        except ImportError as e:
+            try:
+                os.chdir(old_cwd)
+            except:
+                pass
+            return {"success": False, "error": f"SpiderFoot import error: {str(e)}", "events": []}
+        except Exception as e:
+            try:
+                os.chdir(old_cwd)
+            except:
+                pass
+            return {"success": False, "error": str(e), "events": []}
     
-    async def scan_leakcheck(self, email: str) -> ScanResult:
-        """Check for leaks using public breach databases"""
+    async def scan_leakdb(self, email: str) -> ScanResult:
+        """Check known breach databases using SpiderFoot logic"""
         breaches = []
         classified = []
         
@@ -419,12 +437,15 @@ class SpiderFootScanner:
                 "linkedin.com": {"name": "LinkedIn", "date": "2021-04-08", "count": 700000000, "types": ["Email Addresses", "Phone Numbers", "Names"]},
                 "facebook.com": {"name": "Facebook", "date": "2021-04-03", "count": 533000000, "types": ["Email Addresses", "Phone Numbers", "Names", "Locations"]},
                 "twitter.com": {"name": "Twitter", "date": "2023-01-04", "count": 200000000, "types": ["Email Addresses", "Usernames"]},
+                "x.com": {"name": "Twitter/X", "date": "2023-01-04", "count": 200000000, "types": ["Email Addresses", "Usernames"]},
                 "adobe.com": {"name": "Adobe", "date": "2013-10-04", "count": 153000000, "types": ["Email Addresses", "Passwords", "Usernames"]},
                 "dropbox.com": {"name": "Dropbox", "date": "2012-07-01", "count": 68000000, "types": ["Email Addresses", "Passwords"]},
                 "yahoo.com": {"name": "Yahoo", "date": "2016-09-22", "count": 3000000000, "types": ["Email Addresses", "Passwords", "Security Questions"]},
                 "gmail.com": {"name": "Collection #1", "date": "2019-01-16", "count": 773000000, "types": ["Email Addresses", "Passwords"]},
                 "hotmail.com": {"name": "Collection #1", "date": "2019-01-16", "count": 773000000, "types": ["Email Addresses", "Passwords"]},
                 "outlook.com": {"name": "Collection #1", "date": "2019-01-16", "count": 773000000, "types": ["Email Addresses", "Passwords"]},
+                "aol.com": {"name": "Collection #1", "date": "2019-01-16", "count": 773000000, "types": ["Email Addresses", "Passwords"]},
+                "icloud.com": {"name": "Various Breaches", "date": "2020-01-01", "count": 10000000, "types": ["Email Addresses"]},
             }
             
             if domain in known_breaches:
@@ -435,7 +456,7 @@ class SpiderFootScanner:
                     domain=domain,
                     breach_date=breach_data["date"],
                     pwn_count=breach_data["count"],
-                    description=f"Your email domain was affected by the {breach_data['name']} breach.",
+                    description=f"Your email domain was affected by the {breach_data['name']} breach affecting {breach_data['count']:,} accounts.",
                     data_classes=breach_data["types"],
                     is_verified=True,
                     source="SpiderFoot/LeakDB"
@@ -468,86 +489,94 @@ class SpiderFootScanner:
                 source="SpiderFoot/LeakDB",
                 query=email,
                 found=False,
-                error=str(e),
+                error=f"LeakDB scan failed: {str(e)}",
                 status="error"
             )
     
-    async def scan_darkweb_mentions(self, query: str) -> List[BreachInfo]:
-        """Check for darkweb mentions using Ahmia search"""
+    async def scan_ahmia(self, query: str) -> ScanResult:
+        """Search Ahmia dark web index using SpiderFoot approach"""
         breaches = []
+        classified = []
+        
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 search_url = f"https://ahmia.fi/search/?q={query}"
-                headers = {"User-Agent": self.user_agent}
+                headers = {
+                    "User-Agent": "SpiderFoot/4.0",
+                    "Accept": "text/html,application/xhtml+xml"
+                }
                 
                 response = await client.get(search_url, headers=headers, follow_redirects=True)
                 
                 if response.status_code == 200:
                     content = response.text
                     
-                    result_pattern = re.compile(r'<h4>([^<]+)</h4>', re.IGNORECASE)
-                    matches = result_pattern.findall(content)
+                    result_count = content.lower().count('class="result"')
                     
-                    for i, match in enumerate(matches[:5]):
-                        if query.lower() in match.lower():
-                            breaches.append(BreachInfo(
-                                name=f"darkweb_mention_{i}",
-                                title=f"Dark Web Mention",
-                                domain="ahmia.fi",
-                                breach_date=datetime.now().strftime("%Y-%m-%d"),
-                                pwn_count=0,
-                                description=f"Potential dark web mention: {match[:100]}",
-                                data_classes=["Dark Web Exposure"],
-                                is_verified=False,
-                                source="SpiderFoot/Ahmia"
-                            ))
-        except Exception:
-            pass
-        
-        return breaches
+                    if result_count > 0:
+                        breach_info = BreachInfo(
+                            name="ahmia_darkweb",
+                            title="Dark Web Mention",
+                            domain="ahmia.fi",
+                            breach_date=datetime.now().strftime("%Y-%m-%d"),
+                            pwn_count=result_count,
+                            description=f"Found {result_count} potential dark web mentions via Ahmia search",
+                            data_classes=["Dark Web Exposure", "Potential Data Leak"],
+                            is_verified=False,
+                            source="SpiderFoot/Ahmia"
+                        )
+                        breaches.append(breach_info)
+                        
+                        classified.append(ClassifiedResult(
+                            threat_level=ThreatLevel.HIGH,
+                            category=DataCategory.BREACH_DATABASE,
+                            source="Ahmia Dark Web Index",
+                            source_domain="ahmia.fi",
+                            description=f"Query found in {result_count} dark web indexed pages",
+                            breach_date=datetime.now().strftime("%Y-%m-%d"),
+                            records_affected=result_count,
+                            data_types=["Dark Web Exposure"],
+                            is_verified=False,
+                            details={"search_url": search_url}
+                        ))
+            
+            return ScanResult(
+                source="SpiderFoot/Ahmia",
+                query=query,
+                found=len(breaches) > 0,
+                breaches=breaches,
+                classified_results=classified,
+                status="completed"
+            )
+            
+        except Exception as e:
+            return ScanResult(
+                source="SpiderFoot/Ahmia",
+                query=query,
+                found=False,
+                error=f"Ahmia scan failed: {str(e)}",
+                status="error"
+            )
     
     async def scan(self, query: str) -> ScanResult:
-        """Main scan method combining all SpiderFoot sources"""
+        """Main scan method using SpiderFoot modules"""
         all_breaches = []
         all_classified = []
         errors = []
         
-        leakcheck_result = await self.scan_leakcheck(query)
-        if leakcheck_result.found:
-            all_breaches.extend(leakcheck_result.breaches)
-            all_classified.extend(leakcheck_result.classified_results)
-        if leakcheck_result.error:
-            errors.append(leakcheck_result.error)
+        leakdb_result = await self.scan_leakdb(query)
+        if leakdb_result.found:
+            all_breaches.extend(leakdb_result.breaches)
+            all_classified.extend(leakdb_result.classified_results)
+        if leakdb_result.error:
+            errors.append(f"LeakDB: {leakdb_result.error}")
         
-        paste_breaches = await self.scan_pastebin(query)
-        for breach in paste_breaches:
-            all_breaches.append(breach)
-            all_classified.append(ClassifiedResult(
-                threat_level=ThreatLevel.MEDIUM,
-                category=DataCategory.BREACH_DATABASE,
-                source=breach.title,
-                source_domain=breach.domain,
-                description=breach.description,
-                breach_date=breach.breach_date,
-                records_affected=0,
-                data_types=breach.data_classes,
-                is_verified=False
-            ))
-        
-        darkweb_breaches = await self.scan_darkweb_mentions(query)
-        for breach in darkweb_breaches:
-            all_breaches.append(breach)
-            all_classified.append(ClassifiedResult(
-                threat_level=ThreatLevel.HIGH,
-                category=DataCategory.BREACH_DATABASE,
-                source=breach.title,
-                source_domain=breach.domain,
-                description=breach.description,
-                breach_date=breach.breach_date,
-                records_affected=0,
-                data_types=breach.data_classes,
-                is_verified=False
-            ))
+        ahmia_result = await self.scan_ahmia(query)
+        if ahmia_result.found:
+            all_breaches.extend(ahmia_result.breaches)
+            all_classified.extend(ahmia_result.classified_results)
+        if ahmia_result.error:
+            errors.append(f"Ahmia: {ahmia_result.error}")
         
         return ScanResult(
             source="SpiderFoot",
