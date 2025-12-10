@@ -1,5 +1,5 @@
 entrypoint = "main.py"
-modules = ["web", "python-3.11"]
+modules = ["python-3.11", "web", "nodejs-20"]
 
 [nix]
 channel = "stable-25_05"
@@ -49,6 +49,10 @@ externalPort = 80
 [[ports]]
 localPort = 33711
 externalPort = 3000
+
+[[ports]]
+localPort = 34641
+externalPort = 3003
 
 [[ports]]
 localPort = 45421
