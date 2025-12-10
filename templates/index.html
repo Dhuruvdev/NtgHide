@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Censored Scanner</title>
+    <link href="{{ url_for('static', path='/css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div id="loading-overlay">
+        <div class="loading-container">
+            <img src="{{ url_for('static', path='/images/loading.gif') }}" alt="Loading" class="loading-gif">
+            <p class="loading-text">Loading...</p>
+        </div>
+    </div>
+
+    <div id="main-content" class="hidden">
+        <div class="container">
+            <header>
+                <h1 class="glitch" data-text="[CENSORED]">[CENSORED]</h1>
+                <p class="subtitle">Security Scanner</p>
+            </header>
+
+            <main>
+                <div class="card">
+                    <div class="card-header">
+                        <span class="status-indicator"></span>
+                        <h2>System Status</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="info-row">
+                            <span class="label">Status:</span>
+                            <span class="value active">ACTIVE</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Mode:</span>
+                            <span class="value">[REDACTED]</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Access Level:</span>
+                            <span class="value warning">CLASSIFIED</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="status-indicator warning"></span>
+                        <h2>Modules</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="module-list">
+                            <div class="module-item">
+                                <span class="module-icon">&#9608;</span>
+                                <span class="module-name">Darkweb Scan</span>
+                                <span class="module-status ready">Ready</span>
+                            </div>
+                            <div class="module-item">
+                                <span class="module-icon">&#9608;</span>
+                                <span class="module-name">Deepfake Detection</span>
+                                <span class="module-status ready">Ready</span>
+                            </div>
+                            <div class="module-item">
+                                <span class="module-icon">&#9608;</span>
+                                <span class="module-name">[CENSORED]</span>
+                                <span class="module-status locked">Locked</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-primary">Initialize Scan</button>
+                    <button class="btn btn-secondary">View Reports</button>
+                </div>
+            </main>
+
+            <footer>
+                <p class="censored-text">&#9608;&#9608;&#9608;&#9608;&#9608; CLASSIFIED SYSTEM &#9608;&#9608;&#9608;&#9608;&#9608;</p>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                document.getElementById('loading-overlay').classList.add('fade-out');
+                document.getElementById('main-content').classList.remove('hidden');
+                setTimeout(function() {
+                    document.getElementById('loading-overlay').style.display = 'none';
+                }, 500);
+            }, 2000);
+        });
+    </script>
+</body>
+</html>
