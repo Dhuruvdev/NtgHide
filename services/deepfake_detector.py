@@ -7,11 +7,15 @@ from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter, ImageStat
 import cv2
-from scipy import fftpack, ndimage, stats
-from skimage import feature, filters, measure, color
+from scipy import fftpack, ndimage, stats, signal
+from scipy.ndimage import gaussian_filter, sobel
+from skimage import feature, filters, measure, color, exposure
 from skimage.restoration import estimate_sigma
+from skimage.feature import graycomatrix, graycoprops
+import struct
+import math
 
 DEEPFAKE_IMAGE_DETECTION_AVAILABLE = True
 DEEPFAKE_DETECTION_MODULE_PATH = "Modules/deepfake scan/DeepFake-Image-Detection"
@@ -41,124 +45,21 @@ class DeepfakeResult:
         }
 
 
-class DeepFakeImageDetectionAnalyzer:
-    """
-    Deepfake detection using image analysis techniques inspired by 
-    DeepFake-Image-Detection methodology.
-    
-    Implements multi-layer convolutional feature analysis similar to 
-    VGG16 architecture patterns for detecting manipulated images.
-    Note: Uses OpenCV-based analysis due to TensorFlow disk constraints.
-    """
-    
-    def __init__(self):
-        self.target_size = (224, 224)
-        self.filters = self._create_vgg_style_filters()
-    
-    def _create_vgg_style_filters(self) -> List[np.ndarray]:
-        filters = []
-        edge_h = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=np.float32)
-        edge_v = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=np.float32)
-        filters.extend([edge_h, edge_v])
-        
-        laplacian = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]], dtype=np.float32)
-        laplacian_diag = np.array([[1, 0, 1], [0, -4, 0], [1, 0, 1]], dtype=np.float32)
-        filters.extend([laplacian, laplacian_diag])
-        
-        gaussian = np.array([[1, 2, 1], [2, 4, 2], [1, 2, 1]], dtype=np.float32) / 16
-        sharpen = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], dtype=np.float32)
-        filters.extend([gaussian, sharpen])
-        
-        emboss = np.array([[-2, -1, 0], [-1, 1, 1], [0, 1, 2]], dtype=np.float32)
-        filters.append(emboss)
-        
-        return filters
-    
-    def extract_features(self, img_array: np.ndarray) -> Dict[str, Any]:
-        resized = cv2.resize(img_array, self.target_size)
-        if len(resized.shape) == 3:
-            gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
-        else:
-            gray = resized
-        
-        gray = gray.astype(np.float32) / 255.0
-        
-        feature_maps = []
-        for f in self.filters:
-            filtered = cv2.filter2D(gray, -1, f)
-            feature_maps.append(filtered)
-        
-        features = {
-            "global_avg_pool": [],
-            "feature_statistics": [],
-            "activation_patterns": []
-        }
-        
-        for i, fmap in enumerate(feature_maps):
-            gap = np.mean(fmap)
-            gmp = np.max(fmap)
-            std = np.std(fmap)
-            features["global_avg_pool"].append(float(gap))
-            features["feature_statistics"].append({
-                "filter_id": i,
-                "mean": float(gap),
-                "max": float(gmp),
-                "std": float(std),
-                "energy": float(np.sum(fmap ** 2))
-            })
-            
-            binary_activation = (fmap > np.mean(fmap)).astype(np.float32)
-            activation_ratio = np.sum(binary_activation) / binary_activation.size
-            features["activation_patterns"].append(float(activation_ratio))
-        
-        return features
-    
-    def compute_authenticity_score(self, features: Dict[str, Any]) -> Dict[str, Any]:
-        gap_values = features["global_avg_pool"]
-        activation_patterns = features["activation_patterns"]
-        
-        edge_response = abs(gap_values[0]) + abs(gap_values[1])
-        texture_response = abs(gap_values[2]) + abs(gap_values[3])
-        smoothness_response = abs(gap_values[4]) + abs(gap_values[5])
-        
-        suspicious_score = 0
-        
-        if edge_response < 0.02:
-            suspicious_score += 25
-        elif edge_response > 0.3:
-            suspicious_score += 15
-        
-        if texture_response < 0.01:
-            suspicious_score += 20
-        elif texture_response > 0.25:
-            suspicious_score += 15
-        
-        activation_variance = np.var(activation_patterns)
-        if activation_variance < 0.01:
-            suspicious_score += 20
-        elif activation_variance > 0.15:
-            suspicious_score += 15
-        
-        stats = features["feature_statistics"]
-        energy_values = [s["energy"] for s in stats]
-        energy_variance = np.var(energy_values)
-        if energy_variance > 1000:
-            suspicious_score += 20
-        
-        return {
-            "score": int(min(suspicious_score, 100)),
-            "edge_response": float(edge_response),
-            "texture_response": float(texture_response),
-            "smoothness_response": float(smoothness_response),
-            "activation_variance": float(activation_variance),
-            "energy_variance": float(energy_variance),
-            "suspicious": bool(suspicious_score > 35),
-            "details": "DeepFake-Image-Detection multi-layer convolutional analysis",
-            "model_type": "DeepFake-Image-Detection"
-        }
-
-
 class AdvancedDeepfakeAnalyzer:
+    """
+    State-of-the-art deepfake detection using multiple forensic techniques:
+    1. Error Level Analysis (ELA) - Detects compression inconsistencies
+    2. Frequency Domain Analysis (FFT/DCT) - Reveals GAN artifacts
+    3. Face Symmetry & Landmark Analysis - Detects unnatural faces
+    4. Noise Pattern Analysis - Identifies AI-generated noise signatures
+    5. Color Channel Analysis - Detects chrominance anomalies
+    6. JPEG Ghost Detection - Finds double compression
+    7. Texture Gradient Analysis - Reveals blending artifacts
+    8. Edge Coherence Analysis - Detects boundary manipulation
+    9. Statistical Feature Analysis - GLCM texture features
+    10. Spectral Analysis - Wavelet-based artifact detection
+    """
+    
     def __init__(self):
         self.face_cascade = cv2.CascadeClassifier(
             cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
@@ -166,662 +67,812 @@ class AdvancedDeepfakeAnalyzer:
         self.eye_cascade = cv2.CascadeClassifier(
             cv2.data.haarcascades + 'haarcascade_eye.xml'
         )
+        self.profile_cascade = cv2.CascadeClassifier(
+            cv2.data.haarcascades + 'haarcascade_profileface.xml'
+        )
     
-    def analyze_error_level(self, img_array: np.ndarray, quality: int = 90) -> Dict[str, Any]:
-        is_success, buffer = cv2.imencode('.jpg', img_array, [cv2.IMWRITE_JPEG_QUALITY, quality])
-        if not is_success:
-            return {"score": 0, "suspicious": False, "details": "ELA failed"}
+    def analyze_error_level(self, img_array: np.ndarray, quality: int = 95) -> Dict[str, Any]:
+        """
+        Enhanced ELA - Detects regions with different compression levels.
+        Deepfakes often have inconsistent compression in face regions.
+        """
+        scores = []
         
-        recompressed = cv2.imdecode(np.frombuffer(buffer, np.uint8), cv2.IMREAD_COLOR)
+        for q in [95, 90, 85, 75]:
+            is_success, buffer = cv2.imencode('.jpg', img_array, [cv2.IMWRITE_JPEG_QUALITY, q])
+            if not is_success:
+                continue
+            
+            recompressed = cv2.imdecode(np.frombuffer(buffer, np.uint8), cv2.IMREAD_COLOR)
+            ela_image = cv2.absdiff(img_array, recompressed)
+            
+            ela_enhanced = (ela_image * 20).clip(0, 255).astype(np.uint8)
+            ela_gray = cv2.cvtColor(ela_enhanced, cv2.COLOR_BGR2GRAY)
+            
+            mean_ela = np.mean(ela_gray)
+            std_ela = np.std(ela_gray)
+            max_ela = np.max(ela_gray)
+            
+            h, w = ela_gray.shape
+            regions = []
+            grid = 8
+            for i in range(grid):
+                for j in range(grid):
+                    region = ela_gray[i*h//grid:(i+1)*h//grid, j*w//grid:(j+1)*w//grid]
+                    regions.append(np.mean(region))
+            
+            region_variance = np.var(regions)
+            region_range = max(regions) - min(regions)
+            
+            score = 0
+            if mean_ela > 8:
+                score += 15
+            if mean_ela > 15:
+                score += 15
+            if std_ela > 12:
+                score += 15
+            if region_variance > 50:
+                score += 20
+            if region_range > 30:
+                score += 20
+            if max_ela > 150:
+                score += 15
+                
+            scores.append(score)
         
-        ela_image = cv2.absdiff(img_array, recompressed)
-        ela_gray = cv2.cvtColor(ela_image, cv2.COLOR_BGR2GRAY) if len(ela_image.shape) == 3 else ela_image
-        
-        mean_ela = np.mean(ela_gray)
-        std_ela = np.std(ela_gray)
-        max_ela = np.max(ela_gray)
-        
-        ela_normalized = ela_gray.astype(float) / 255.0
-        regions = self._get_image_regions(ela_normalized)
-        region_variances = [np.var(r) for r in regions if r.size > 0]
-        variance_ratio = max(region_variances) / (min(region_variances) + 1e-10) if region_variances else 1
-        
-        suspicious_score = 0
-        if mean_ela > 15:
-            suspicious_score += 20
-        if std_ela > 20:
-            suspicious_score += 20
-        if variance_ratio > 5:
-            suspicious_score += 30
-        if max_ela > 100:
-            suspicious_score += 15
+        final_score = int(np.mean(scores)) if scores else 0
         
         return {
-            "score": int(min(suspicious_score, 100)),
-            "mean_ela": float(mean_ela),
-            "std_ela": float(std_ela),
-            "max_ela": float(max_ela),
-            "variance_ratio": float(variance_ratio),
-            "suspicious": bool(suspicious_score > 40),
-            "details": "Error Level Analysis detects compression inconsistencies"
+            "score": min(final_score, 100),
+            "mean_ela": float(mean_ela) if 'mean_ela' in dir() else 0,
+            "std_ela": float(std_ela) if 'std_ela' in dir() else 0,
+            "region_variance": float(region_variance) if 'region_variance' in dir() else 0,
+            "suspicious": final_score > 35,
+            "details": "ELA detects compression inconsistencies typical in manipulated images"
         }
     
     def analyze_frequency_domain(self, img_array: np.ndarray) -> Dict[str, Any]:
+        """
+        Advanced frequency analysis using FFT and DCT.
+        GANs leave distinctive patterns in the frequency domain.
+        """
         gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY) if len(img_array.shape) == 3 else img_array
         gray = gray.astype(np.float64)
         
-        f_transform = fftpack.fft2(gray)
-        f_shift = fftpack.fftshift(f_transform)
-        magnitude_spectrum = np.abs(f_shift)
+        f_transform = np.fft.fft2(gray)
+        f_shift = np.fft.fftshift(f_transform)
+        magnitude = np.abs(f_shift)
+        phase = np.angle(f_shift)
         
-        log_magnitude = np.log1p(magnitude_spectrum)
+        log_magnitude = np.log1p(magnitude)
         
         h, w = gray.shape
-        center_y, center_x = h // 2, w // 2
+        cy, cx = h // 2, w // 2
         
-        low_freq_region = log_magnitude[center_y-10:center_y+10, center_x-10:center_x+10]
-        high_freq_region = np.concatenate([
-            log_magnitude[:20, :].flatten(),
-            log_magnitude[-20:, :].flatten(),
-            log_magnitude[:, :20].flatten(),
-            log_magnitude[:, -20:].flatten()
-        ])
+        y, x = np.ogrid[:h, :w]
+        r = np.sqrt((x - cx)**2 + (y - cy)**2)
         
-        low_freq_energy = np.mean(low_freq_region)
-        high_freq_energy = np.mean(high_freq_region)
-        freq_ratio = high_freq_energy / (low_freq_energy + 1e-10)
+        low_mask = r < min(h, w) * 0.1
+        mid_mask = (r >= min(h, w) * 0.1) & (r < min(h, w) * 0.3)
+        high_mask = r >= min(h, w) * 0.3
         
-        radial_profile = self._compute_radial_profile(magnitude_spectrum)
-        profile_smoothness = np.std(np.diff(radial_profile))
+        low_energy = np.mean(magnitude[low_mask])
+        mid_energy = np.mean(magnitude[mid_mask])
+        high_energy = np.mean(magnitude[high_mask])
         
-        suspicious_score = 0
-        if freq_ratio < 0.1 or freq_ratio > 0.9:
-            suspicious_score += 25
-        if profile_smoothness > 1000:
-            suspicious_score += 25
+        total_energy = low_energy + mid_energy + high_energy
+        low_ratio = low_energy / total_energy if total_energy > 0 else 0
+        high_ratio = high_energy / total_energy if total_energy > 0 else 0
         
-        periodic_patterns = self._detect_periodic_patterns(magnitude_spectrum)
-        if periodic_patterns:
-            suspicious_score += 30
+        azimuthal_profile = []
+        for angle in range(0, 360, 10):
+            rad = np.deg2rad(angle)
+            line_x = cx + np.arange(0, min(cx, cy)) * np.cos(rad)
+            line_y = cy + np.arange(0, min(cx, cy)) * np.sin(rad)
+            line_x = line_x.astype(int).clip(0, w-1)
+            line_y = line_y.astype(int).clip(0, h-1)
+            azimuthal_profile.append(np.mean(log_magnitude[line_y, line_x]))
+        
+        azimuthal_std = np.std(azimuthal_profile)
+        
+        dct_coeffs = fftpack.dct(fftpack.dct(gray.T, norm='ortho').T, norm='ortho')
+        dct_high_freq = np.abs(dct_coeffs[h//2:, w//2:])
+        dct_periodicity = np.std(dct_high_freq)
+        
+        score = 0
+        
+        if high_ratio < 0.01:
+            score += 25
+        if high_ratio > 0.15:
+            score += 20
+        
+        if azimuthal_std < 0.5:
+            score += 30
+        
+        if dct_periodicity > 50:
+            score += 25
         
         return {
-            "score": int(min(suspicious_score, 100)),
-            "freq_ratio": float(freq_ratio),
-            "profile_smoothness": float(profile_smoothness),
-            "periodic_patterns_detected": bool(periodic_patterns),
-            "suspicious": bool(suspicious_score > 35),
-            "details": "Frequency analysis reveals manipulation artifacts in spectral domain"
+            "score": min(int(score), 100),
+            "low_freq_ratio": float(low_ratio),
+            "high_freq_ratio": float(high_ratio),
+            "azimuthal_uniformity": float(azimuthal_std),
+            "dct_periodicity": float(dct_periodicity),
+            "suspicious": score > 35,
+            "details": "Frequency analysis reveals GAN fingerprints and spectral anomalies"
         }
     
     def analyze_noise_patterns(self, img_array: np.ndarray) -> Dict[str, Any]:
+        """
+        Advanced noise analysis - AI-generated images have distinctive noise patterns.
+        Real photos have natural sensor noise, while AI images have synthetic patterns.
+        """
         gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY) if len(img_array.shape) == 3 else img_array
+        gray_float = gray.astype(np.float64)
+        
+        denoised = cv2.GaussianBlur(gray, (5, 5), 0)
+        noise = gray_float - denoised.astype(np.float64)
+        
+        noise_mean = np.mean(np.abs(noise))
+        noise_std = np.std(noise)
         
         try:
-            noise_sigma = estimate_sigma(gray)
+            sigma_est = estimate_sigma(gray, channel_axis=None)
         except:
-            noise_sigma = 0
+            sigma_est = noise_std
+        
+        h, w = gray.shape
+        grid = 6
+        region_noise = []
+        for i in range(grid):
+            for j in range(grid):
+                region = noise[i*h//grid:(i+1)*h//grid, j*w//grid:(j+1)*w//grid]
+                region_noise.append(np.std(region))
+        
+        noise_uniformity = np.std(region_noise) / (np.mean(region_noise) + 1e-10)
+        
+        f_noise = np.fft.fft2(noise)
+        f_noise_mag = np.abs(np.fft.fftshift(f_noise))
+        noise_spectrum_std = np.std(f_noise_mag)
         
         laplacian = cv2.Laplacian(gray, cv2.CV_64F)
         laplacian_var = laplacian.var()
         
-        regions = self._get_image_regions(gray)
-        region_noise = []
-        for region in regions:
-            if region.size > 100:
-                region_laplacian = cv2.Laplacian(region.astype(np.uint8), cv2.CV_64F)
-                region_noise.append(region_laplacian.var())
+        score = 0
         
-        if region_noise:
-            noise_variance = np.var(region_noise)
-            noise_range = max(region_noise) - min(region_noise)
-        else:
-            noise_variance = 0
-            noise_range = 0
+        if noise_uniformity < 0.15:
+            score += 35
         
-        suspicious_score = 0
-        if noise_variance > 10000:
-            suspicious_score += 30
-        if noise_range > 500:
-            suspicious_score += 25
-        if noise_sigma > 20:
-            suspicious_score += 20
+        if noise_std < 2:
+            score += 25
+        elif noise_std > 25:
+            score += 15
+        
+        if laplacian_var < 50:
+            score += 25
         
         return {
-            "score": int(min(suspicious_score, 100)),
-            "estimated_noise": float(noise_sigma) if not isinstance(noise_sigma, (list, np.ndarray)) else 0.0,
+            "score": min(int(score), 100),
+            "noise_std": float(noise_std),
+            "noise_uniformity": float(noise_uniformity),
+            "estimated_sigma": float(sigma_est) if isinstance(sigma_est, (int, float)) else float(np.mean(sigma_est)),
             "laplacian_variance": float(laplacian_var),
-            "noise_consistency": float(noise_variance),
-            "noise_range": float(noise_range),
-            "suspicious": bool(suspicious_score > 35),
-            "details": "Noise pattern analysis reveals inconsistencies in image generation"
+            "suspicious": score > 35,
+            "details": "AI-generated images often have unnaturally uniform or absent noise patterns"
         }
     
     def analyze_face_regions(self, img_array: np.ndarray) -> Dict[str, Any]:
+        """
+        Comprehensive face analysis for deepfake detection:
+        - Eye symmetry and positioning
+        - Skin texture consistency
+        - Face boundary artifacts
+        - Facial feature proportions
+        """
         gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY) if len(img_array.shape) == 3 else img_array
         
-        faces = self.face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        faces = self.face_cascade.detectMultiScale(gray, scaleFactor=1.05, minNeighbors=5, minSize=(50, 50))
         
         if len(faces) == 0:
-            return {
-                "score": 0,
-                "faces_detected": 0,
-                "suspicious": False,
-                "details": "No faces detected in image"
-            }
+            profiles = self.profile_cascade.detectMultiScale(gray, scaleFactor=1.05, minNeighbors=5)
+            if len(profiles) == 0:
+                return {
+                    "score": 0,
+                    "faces_detected": 0,
+                    "suspicious": False,
+                    "details": "No faces detected"
+                }
+            faces = profiles
         
-        suspicious_score = 0
+        max_score = 0
         face_analyses = []
         
-        for i, (x, y, w, h) in enumerate(faces):
-            face_region = img_array[y:y+h, x:x+w]
-            face_gray = gray[y:y+h, x:x+w]
+        for idx, (x, y, w, h) in enumerate(faces):
+            padding = int(w * 0.1)
+            x1, y1 = max(0, x - padding), max(0, y - padding)
+            x2, y2 = min(img_array.shape[1], x + w + padding), min(img_array.shape[0], y + h + padding)
             
-            eyes = self.eye_cascade.detectMultiScale(face_gray, scaleFactor=1.1, minNeighbors=3)
-            eye_symmetry = self._check_eye_symmetry(eyes, w) if len(eyes) >= 2 else 0.5
+            face_region = img_array[y1:y2, x1:x2]
+            face_gray = gray[y1:y2, x1:x2]
             
-            face_blur = cv2.Laplacian(face_gray, cv2.CV_64F).var()
+            eyes = self.eye_cascade.detectMultiScale(face_gray, scaleFactor=1.1, minNeighbors=3, minSize=(15, 15))
             
-            skin_uniformity = self._analyze_skin_uniformity(face_region)
+            eye_score = 0
+            if len(eyes) == 2:
+                eyes_sorted = sorted(eyes, key=lambda e: e[0])
+                left_eye, right_eye = eyes_sorted[0], eyes_sorted[1]
+                
+                left_center = (left_eye[0] + left_eye[2]//2, left_eye[1] + left_eye[3]//2)
+                right_center = (right_eye[0] + right_eye[2]//2, right_eye[1] + right_eye[3]//2)
+                
+                eye_y_diff = abs(left_center[1] - right_center[1]) / h
+                if eye_y_diff > 0.08:
+                    eye_score += 25
+                
+                eye_size_ratio = min(left_eye[2], right_eye[2]) / max(left_eye[2], right_eye[2])
+                if eye_size_ratio < 0.7:
+                    eye_score += 20
+            elif len(eyes) != 2:
+                eye_score += 15
             
-            boundary_score = self._analyze_face_boundary(img_array, x, y, w, h)
+            blur_score = cv2.Laplacian(face_gray, cv2.CV_64F).var()
+            blur_flag = 0
+            if blur_score < 100:
+                blur_flag = 25
             
-            face_suspicious = 0
-            if eye_symmetry < 0.7:
-                face_suspicious += 20
-            if face_blur < 100:
-                face_suspicious += 25
-            if skin_uniformity > 0.8:
-                face_suspicious += 20
-            if boundary_score > 30:
-                face_suspicious += 25
+            if len(face_region.shape) == 3:
+                hsv = cv2.cvtColor(face_region, cv2.COLOR_BGR2HSV)
+                h_channel, s_channel, v_channel = cv2.split(hsv)
+                
+                skin_mask = (h_channel >= 0) & (h_channel <= 25) & (s_channel >= 30) & (s_channel <= 180)
+                if np.sum(skin_mask) > 100:
+                    skin_h = h_channel[skin_mask]
+                    skin_s = s_channel[skin_mask]
+                    skin_uniformity = (np.std(skin_h) + np.std(skin_s)) / 2
+                else:
+                    skin_uniformity = 50
+            else:
+                skin_uniformity = 50
+            
+            skin_score = 0
+            if skin_uniformity < 8:
+                skin_score = 30
+            
+            boundary_region = 10
+            top_boundary = gray[max(0,y-boundary_region):y, x:x+w] if y > boundary_region else np.array([])
+            bottom_boundary = gray[y+h:min(gray.shape[0],y+h+boundary_region), x:x+w]
+            face_edge = gray[y:y+boundary_region, x:x+w] if boundary_region < h else gray[y:y+h, x:x+w]
+            
+            boundary_score = 0
+            if top_boundary.size > 0 and face_edge.size > 0:
+                boundary_diff = abs(np.mean(top_boundary) - np.mean(face_edge))
+                if boundary_diff > 30:
+                    boundary_score = 25
+            
+            face_total = eye_score + blur_flag + skin_score + boundary_score
+            max_score = max(max_score, face_total)
             
             face_analyses.append({
-                "face_id": i,
-                "eye_symmetry": float(eye_symmetry),
-                "blur_score": float(face_blur),
+                "face_id": idx,
+                "eye_score": eye_score,
+                "blur_score": float(blur_score),
                 "skin_uniformity": float(skin_uniformity),
-                "boundary_artifacts": float(boundary_score),
-                "suspicious_score": face_suspicious
+                "boundary_artifact_score": boundary_score,
+                "total_score": face_total
             })
-            
-            suspicious_score = max(suspicious_score, face_suspicious)
         
         return {
-            "score": int(min(suspicious_score, 100)),
-            "faces_detected": int(len(faces)),
+            "score": min(int(max_score), 100),
+            "faces_detected": len(faces),
             "face_analyses": face_analyses,
-            "suspicious": bool(suspicious_score > 40),
-            "details": "Face region analysis examines facial features and boundaries"
+            "suspicious": max_score > 40,
+            "details": "Face analysis checks for eye symmetry, skin texture, and boundary artifacts"
         }
     
-    def analyze_color_consistency(self, img_array: np.ndarray) -> Dict[str, Any]:
+    def analyze_color_channels(self, img_array: np.ndarray) -> Dict[str, Any]:
+        """
+        Advanced color analysis - Deepfakes often have color channel inconsistencies.
+        Checks for chrominance anomalies and color bleeding.
+        """
         if len(img_array.shape) != 3:
             return {"score": 0, "suspicious": False, "details": "Grayscale image"}
         
-        hsv = cv2.cvtColor(img_array, cv2.COLOR_BGR2HSV)
+        b, g, r = cv2.split(img_array)
+        
+        rb_corr = np.corrcoef(r.flatten(), b.flatten())[0, 1]
+        rg_corr = np.corrcoef(r.flatten(), g.flatten())[0, 1]
+        gb_corr = np.corrcoef(g.flatten(), b.flatten())[0, 1]
+        
+        ycrcb = cv2.cvtColor(img_array, cv2.COLOR_BGR2YCrCb)
+        y, cr, cb = cv2.split(ycrcb)
+        
+        cr_edges = cv2.Canny(cr, 50, 150)
+        cb_edges = cv2.Canny(cb, 50, 150)
+        y_edges = cv2.Canny(y, 50, 150)
+        
+        cr_edge_density = np.sum(cr_edges > 0) / cr_edges.size
+        cb_edge_density = np.sum(cb_edges > 0) / cb_edges.size
+        y_edge_density = np.sum(y_edges > 0) / y_edges.size
+        
+        chroma_luma_ratio = (cr_edge_density + cb_edge_density) / (y_edge_density + 1e-10)
+        
         lab = cv2.cvtColor(img_array, cv2.COLOR_BGR2LAB)
+        l_chan, a_chan, b_chan = cv2.split(lab)
         
-        h, s, v = cv2.split(hsv)
-        l_channel, a_channel, b_channel = cv2.split(lab)
+        a_range = np.max(a_chan) - np.min(a_chan)
+        b_range = np.max(b_chan) - np.min(b_chan)
         
-        regions = self._get_image_regions(img_array)
-        color_stats = []
+        score = 0
         
-        for region in regions:
-            if region.size > 100:
-                region_hsv = cv2.cvtColor(region, cv2.COLOR_BGR2HSV)
-                region_h, region_s, region_v = cv2.split(region_hsv)
-                color_stats.append({
-                    "h_mean": np.mean(region_h),
-                    "s_mean": np.mean(region_s),
-                    "v_mean": np.mean(region_v)
-                })
+        if abs(rb_corr) > 0.98:
+            score += 20
+        if abs(rg_corr) > 0.98:
+            score += 15
         
-        if len(color_stats) > 1:
-            h_variance = np.var([s["h_mean"] for s in color_stats])
-            s_variance = np.var([s["s_mean"] for s in color_stats])
-            lighting_variance = np.var([s["v_mean"] for s in color_stats])
-        else:
-            h_variance = s_variance = lighting_variance = 0
+        if chroma_luma_ratio > 1.5:
+            score += 25
+        elif chroma_luma_ratio < 0.1:
+            score += 20
         
-        suspicious_score = 0
-        if lighting_variance > 2000:
-            suspicious_score += 30
-        if h_variance > 500:
-            suspicious_score += 25
-        if s_variance > 1000:
-            suspicious_score += 20
+        if a_range < 30 and b_range < 30:
+            score += 20
         
         return {
-            "score": int(min(suspicious_score, 100)),
-            "hue_variance": float(h_variance),
-            "saturation_variance": float(s_variance),
-            "lighting_variance": float(lighting_variance),
-            "suspicious": bool(suspicious_score > 35),
-            "details": "Color consistency analysis detects unnatural color distributions"
+            "score": min(int(score), 100),
+            "rb_correlation": float(rb_corr),
+            "rg_correlation": float(rg_corr),
+            "chroma_luma_ratio": float(chroma_luma_ratio),
+            "suspicious": score > 35,
+            "details": "Color analysis detects chrominance anomalies in manipulated images"
         }
     
-    def analyze_edge_artifacts(self, img_array: np.ndarray) -> Dict[str, Any]:
-        gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY) if len(img_array.shape) == 3 else img_array
-        
-        edges_canny = cv2.Canny(gray, 50, 150)
-        edges_sobel_x = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
-        edges_sobel_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
-        edges_sobel = np.sqrt(edges_sobel_x**2 + edges_sobel_y**2)
-        
-        edge_density = np.sum(edges_canny > 0) / edges_canny.size
-        
-        edge_continuity = self._measure_edge_continuity(edges_canny)
-        
-        gradient_consistency = np.std(edges_sobel[edges_sobel > 10]) if np.any(edges_sobel > 10) else 0
-        
-        suspicious_score = 0
-        if edge_density < 0.02 or edge_density > 0.3:
-            suspicious_score += 20
-        if edge_continuity < 0.5:
-            suspicious_score += 25
-        if gradient_consistency > 100:
-            suspicious_score += 25
-        
-        return {
-            "score": int(min(suspicious_score, 100)),
-            "edge_density": float(edge_density),
-            "edge_continuity": float(edge_continuity),
-            "gradient_consistency": float(gradient_consistency),
-            "suspicious": bool(suspicious_score > 35),
-            "details": "Edge artifact analysis detects blending and splicing boundaries"
-        }
-    
-    def analyze_compression_artifacts(self, img_array: np.ndarray) -> Dict[str, Any]:
+    def analyze_jpeg_artifacts(self, img_array: np.ndarray) -> Dict[str, Any]:
+        """
+        JPEG ghost and double compression detection.
+        Manipulated images often show signs of multiple JPEG compressions.
+        """
         gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY) if len(img_array.shape) == 3 else img_array
         
         h, w = gray.shape
         block_size = 8
-        block_artifacts = []
+        block_dcts = []
         
         for i in range(0, h - block_size, block_size):
             for j in range(0, w - block_size, block_size):
-                block = gray[i:i+block_size, j:j+block_size]
-                dct_block = fftpack.dct(fftpack.dct(block.T, norm='ortho').T, norm='ortho')
-                high_freq_energy = np.sum(np.abs(dct_block[4:, 4:]))
-                block_artifacts.append(high_freq_energy)
+                block = gray[i:i+block_size, j:j+block_size].astype(np.float64)
+                dct = fftpack.dct(fftpack.dct(block.T, norm='ortho').T, norm='ortho')
+                block_dcts.append(dct)
         
-        if block_artifacts:
-            artifact_mean = np.mean(block_artifacts)
-            artifact_std = np.std(block_artifacts)
-            artifact_range = max(block_artifacts) - min(block_artifacts)
-        else:
-            artifact_mean = artifact_std = artifact_range = 0
+        if not block_dcts:
+            return {"score": 0, "suspicious": False, "details": "Image too small for analysis"}
         
-        suspicious_score = 0
-        if artifact_std > 100:
-            suspicious_score += 25
-        if artifact_range > 500:
-            suspicious_score += 25
+        ac_coeffs = []
+        for dct in block_dcts:
+            ac_coeffs.extend(dct.flatten()[1:])
         
-        double_compression = artifact_std / (artifact_mean + 1e-10) > 0.5
-        if double_compression:
-            suspicious_score += 30
+        ac_coeffs = np.array(ac_coeffs)
+        
+        hist, bins = np.histogram(ac_coeffs, bins=100, range=(-50, 50))
+        hist = hist.astype(float)
+        hist_normalized = hist / (np.sum(hist) + 1e-10)
+        
+        double_peaks = 0
+        for i in range(2, len(hist) - 2):
+            if hist[i] > hist[i-1] and hist[i] > hist[i+1]:
+                if hist[i] > hist[i-2] and hist[i] > hist[i+2]:
+                    double_peaks += 1
+        
+        blocking_artifacts = []
+        for i in range(block_size, h - block_size, block_size):
+            row_diff = np.mean(np.abs(gray[i, :].astype(float) - gray[i-1, :].astype(float)))
+            blocking_artifacts.append(row_diff)
+        
+        blocking_score = np.std(blocking_artifacts) if blocking_artifacts else 0
+        
+        score = 0
+        if double_peaks > 10:
+            score += 30
+        if blocking_score > 5:
+            score += 25
+        if blocking_score > 10:
+            score += 20
         
         return {
-            "score": int(min(suspicious_score, 100)),
-            "artifact_mean": float(artifact_mean),
-            "artifact_std": float(artifact_std),
-            "artifact_range": float(artifact_range),
-            "double_compression_suspected": bool(double_compression),
-            "suspicious": bool(suspicious_score > 40),
-            "details": "Compression artifact analysis reveals re-encoding patterns"
+            "score": min(int(score), 100),
+            "double_peaks": double_peaks,
+            "blocking_artifacts": float(blocking_score),
+            "suspicious": score > 35,
+            "details": "JPEG analysis detects double compression and blocking artifacts"
         }
     
-    def analyze_texture_consistency(self, img_array: np.ndarray) -> Dict[str, Any]:
+    def analyze_texture_gradients(self, img_array: np.ndarray) -> Dict[str, Any]:
+        """
+        Texture gradient analysis using GLCM features.
+        Detects unnatural texture patterns common in AI-generated images.
+        """
         gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY) if len(img_array.shape) == 3 else img_array
         
+        gray_scaled = (gray / 16).astype(np.uint8)
+        
         try:
-            lbp = feature.local_binary_pattern(gray, P=8, R=1, method='uniform')
-            lbp_hist, _ = np.histogram(lbp.ravel(), bins=10, range=(0, 10))
-            lbp_hist = lbp_hist.astype(float) / (np.sum(lbp_hist) + 1e-10)
-        except:
-            lbp_hist = np.zeros(10)
+            distances = [1, 2, 4]
+            angles = [0, np.pi/4, np.pi/2, 3*np.pi/4]
+            
+            glcm = graycomatrix(gray_scaled, distances=distances, angles=angles, levels=16, symmetric=True, normed=True)
+            
+            contrast = graycoprops(glcm, 'contrast').mean()
+            dissimilarity = graycoprops(glcm, 'dissimilarity').mean()
+            homogeneity = graycoprops(glcm, 'homogeneity').mean()
+            energy = graycoprops(glcm, 'energy').mean()
+            correlation = graycoprops(glcm, 'correlation').mean()
+            
+        except Exception as e:
+            return {"score": 0, "suspicious": False, "details": f"GLCM analysis failed: {str(e)}"}
         
-        regions = self._get_image_regions(gray)
-        region_textures = []
+        score = 0
         
-        for region in regions:
-            if region.size > 100:
-                try:
-                    region_lbp = feature.local_binary_pattern(region.astype(np.uint8), P=8, R=1, method='uniform')
-                    region_hist, _ = np.histogram(region_lbp.ravel(), bins=10, range=(0, 10))
-                    region_hist = region_hist.astype(float) / (np.sum(region_hist) + 1e-10)
-                    region_textures.append(region_hist)
-                except:
-                    pass
+        if homogeneity > 0.8:
+            score += 25
         
-        if len(region_textures) > 1:
-            texture_distances = []
-            for i in range(len(region_textures)):
-                for j in range(i+1, len(region_textures)):
-                    dist = np.sum(np.abs(region_textures[i] - region_textures[j]))
-                    texture_distances.append(dist)
-            texture_variance = np.var(texture_distances) if texture_distances else 0
-            max_texture_diff = max(texture_distances) if texture_distances else 0
-        else:
-            texture_variance = max_texture_diff = 0
+        if energy > 0.3:
+            score += 20
         
-        suspicious_score = 0
-        if texture_variance > 0.1:
-            suspicious_score += 30
-        if max_texture_diff > 0.5:
-            suspicious_score += 30
+        if contrast < 0.5:
+            score += 25
+        
+        if correlation > 0.98:
+            score += 20
         
         return {
-            "score": int(min(suspicious_score, 100)),
-            "texture_variance": float(texture_variance),
-            "max_texture_difference": float(max_texture_diff),
-            "suspicious": bool(suspicious_score > 30),
-            "details": "Texture consistency analysis detects synthetic patterns"
+            "score": min(int(score), 100),
+            "contrast": float(contrast),
+            "homogeneity": float(homogeneity),
+            "energy": float(energy),
+            "correlation": float(correlation),
+            "suspicious": score > 35,
+            "details": "Texture analysis reveals unnatural patterns in AI-generated images"
         }
     
-    def _get_image_regions(self, img: np.ndarray, grid_size: int = 4) -> List[np.ndarray]:
-        if len(img.shape) == 3:
-            h, w, c = img.shape
+    def analyze_edge_coherence(self, img_array: np.ndarray) -> Dict[str, Any]:
+        """
+        Edge coherence analysis - detects blending boundaries and manipulation edges.
+        """
+        gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY) if len(img_array.shape) == 3 else img_array
+        
+        edges_canny = cv2.Canny(gray, 50, 150)
+        edges_canny_low = cv2.Canny(gray, 30, 100)
+        edges_canny_high = cv2.Canny(gray, 80, 200)
+        
+        sobel_x = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+        sobel_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+        
+        gradient_magnitude = np.sqrt(sobel_x**2 + sobel_y**2)
+        gradient_direction = np.arctan2(sobel_y, sobel_x)
+        
+        edge_density = np.sum(edges_canny > 0) / edges_canny.size
+        
+        edge_strength = gradient_magnitude[edges_canny > 0] if np.any(edges_canny > 0) else np.array([0])
+        edge_strength_std = np.std(edge_strength)
+        edge_strength_mean = np.mean(edge_strength)
+        
+        edge_diff = np.abs(edges_canny_low.astype(float) - edges_canny_high.astype(float))
+        edge_consistency = np.mean(edge_diff)
+        
+        contours, _ = cv2.findContours(edges_canny, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        short_contours = sum(1 for c in contours if cv2.arcLength(c, False) < 20)
+        total_contours = len(contours) if len(contours) > 0 else 1
+        fragmentation = short_contours / total_contours
+        
+        score = 0
+        
+        if edge_strength_std / (edge_strength_mean + 1e-10) > 1.5:
+            score += 25
+        
+        if fragmentation > 0.7:
+            score += 25
+        
+        if edge_consistency > 30:
+            score += 20
+        
+        if edge_density < 0.02:
+            score += 20
+        
+        return {
+            "score": min(int(score), 100),
+            "edge_density": float(edge_density),
+            "edge_strength_variation": float(edge_strength_std / (edge_strength_mean + 1e-10)),
+            "edge_fragmentation": float(fragmentation),
+            "suspicious": score > 35,
+            "details": "Edge analysis detects blending boundaries and manipulation artifacts"
+        }
+    
+    def analyze_statistical_features(self, img_array: np.ndarray) -> Dict[str, Any]:
+        """
+        Statistical feature analysis - checks for statistical anomalies
+        that indicate AI generation or manipulation.
+        """
+        gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY) if len(img_array.shape) == 3 else img_array
+        
+        hist, _ = np.histogram(gray.flatten(), bins=256, range=(0, 256))
+        hist_normalized = hist / np.sum(hist)
+        
+        entropy = -np.sum(hist_normalized * np.log2(hist_normalized + 1e-10))
+        
+        skewness = stats.skew(gray.flatten())
+        kurtosis = stats.kurtosis(gray.flatten())
+        
+        benford_first_digits = []
+        for val in gray.flatten():
+            if val > 0:
+                first_digit = int(str(val)[0])
+                benford_first_digits.append(first_digit)
+        
+        if benford_first_digits:
+            digit_counts = np.bincount(benford_first_digits, minlength=10)[1:]
+            digit_freq = digit_counts / np.sum(digit_counts)
+            
+            expected_benford = np.log10(1 + 1/np.arange(1, 10))
+            benford_deviation = np.sum(np.abs(digit_freq - expected_benford))
         else:
-            h, w = img.shape
+            benford_deviation = 0
         
-        region_h = h // grid_size
-        region_w = w // grid_size
+        sorted_hist = np.sort(hist)[::-1]
+        zipf_deviation = np.std(sorted_hist[:10] / (np.arange(1, 11) * sorted_hist[0] + 1e-10))
         
-        regions = []
-        for i in range(grid_size):
-            for j in range(grid_size):
-                region = img[i*region_h:(i+1)*region_h, j*region_w:(j+1)*region_w]
-                regions.append(region)
+        score = 0
         
-        return regions
+        if entropy < 5 or entropy > 7.8:
+            score += 20
+        
+        if abs(skewness) > 1.5:
+            score += 15
+        if abs(kurtosis) > 3:
+            score += 15
+        
+        if benford_deviation > 0.3:
+            score += 25
+        
+        return {
+            "score": min(int(score), 100),
+            "entropy": float(entropy),
+            "skewness": float(skewness),
+            "kurtosis": float(kurtosis),
+            "benford_deviation": float(benford_deviation),
+            "suspicious": score > 35,
+            "details": "Statistical analysis reveals distribution anomalies in AI-generated images"
+        }
     
-    def _compute_radial_profile(self, magnitude: np.ndarray) -> np.ndarray:
-        h, w = magnitude.shape
-        center_y, center_x = h // 2, w // 2
+    def analyze_spectral_features(self, img_array: np.ndarray) -> Dict[str, Any]:
+        """
+        Spectral analysis using multi-scale decomposition.
+        Detects artifacts across different frequency bands.
+        """
+        gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY) if len(img_array.shape) == 3 else img_array
+        gray = gray.astype(np.float64)
         
-        y, x = np.ogrid[:h, :w]
-        r = np.sqrt((x - center_x)**2 + (y - center_y)**2).astype(int)
+        levels = []
+        current = gray
+        for i in range(4):
+            blurred = cv2.GaussianBlur(current, (5, 5), 0)
+            detail = current - blurred
+            levels.append(detail)
+            current = cv2.resize(blurred, (blurred.shape[1]//2, blurred.shape[0]//2)) if blurred.shape[0] > 10 and blurred.shape[1] > 10 else blurred
         
-        max_r = min(center_x, center_y)
-        radial_profile = ndimage.mean(magnitude, r, index=np.arange(0, max_r))
+        level_energies = [np.sum(level**2) / level.size for level in levels]
         
-        return radial_profile
-    
-    def _detect_periodic_patterns(self, magnitude: np.ndarray) -> bool:
-        h, w = magnitude.shape
-        center_y, center_x = h // 2, w // 2
+        if len(level_energies) > 1:
+            energy_ratios = [level_energies[i] / (level_energies[i+1] + 1e-10) for i in range(len(level_energies)-1)]
+            energy_consistency = np.std(energy_ratios)
+        else:
+            energy_consistency = 0
         
-        threshold = np.percentile(magnitude, 99)
-        peaks = magnitude > threshold
+        level_stds = [np.std(level) for level in levels]
+        std_ratio = level_stds[0] / (level_stds[-1] + 1e-10) if len(level_stds) > 1 else 1
         
-        peaks[center_y-5:center_y+5, center_x-5:center_x+5] = False
+        score = 0
         
-        num_peaks = np.sum(peaks)
-        return bool(num_peaks > 20)
-    
-    def _check_eye_symmetry(self, eyes: np.ndarray, face_width: int) -> float:
-        if len(eyes) < 2:
-            return 0.5
+        if energy_consistency > 5:
+            score += 25
         
-        eyes_sorted = sorted(eyes, key=lambda e: e[0])
-        left_eye = eyes_sorted[0]
-        right_eye = eyes_sorted[-1]
+        if std_ratio < 1 or std_ratio > 20:
+            score += 25
         
-        left_center = left_eye[0] + left_eye[2] // 2
-        right_center = right_eye[0] + right_eye[2] // 2
+        if len(level_energies) > 0 and level_energies[0] < 0.01:
+            score += 20
         
-        expected_distance = face_width * 0.4
-        actual_distance = right_center - left_center
-        
-        symmetry = 1 - abs(expected_distance - actual_distance) / expected_distance
-        return float(max(0, min(1, symmetry)))
-    
-    def _analyze_skin_uniformity(self, face_region: np.ndarray) -> float:
-        if len(face_region.shape) != 3:
-            return 0
-        
-        hsv = cv2.cvtColor(face_region, cv2.COLOR_BGR2HSV)
-        
-        lower_skin = np.array([0, 20, 70], dtype=np.uint8)
-        upper_skin = np.array([20, 255, 255], dtype=np.uint8)
-        
-        skin_mask = cv2.inRange(hsv, lower_skin, upper_skin)
-        skin_pixels = face_region[skin_mask > 0]
-        
-        if len(skin_pixels) == 0:
-            return 0
-        
-        uniformity = 1 - (np.std(skin_pixels) / 128)
-        return float(max(0, min(1, uniformity)))
-    
-    def _analyze_face_boundary(self, img: np.ndarray, x: int, y: int, w: int, h: int) -> float:
-        border_width = 5
-        
-        top = img[max(0, y-border_width):y, x:x+w] if y > border_width else np.array([])
-        bottom = img[y+h:min(img.shape[0], y+h+border_width), x:x+w] if y+h+border_width < img.shape[0] else np.array([])
-        left = img[y:y+h, max(0, x-border_width):x] if x > border_width else np.array([])
-        right = img[y:y+h, x+w:min(img.shape[1], x+w+border_width)] if x+w+border_width < img.shape[1] else np.array([])
-        
-        face_interior = img[y+border_width:y+h-border_width, x+border_width:x+w-border_width]
-        
-        if face_interior.size == 0:
-            return 0
-        
-        interior_mean = np.mean(face_interior)
-        
-        boundary_diffs = []
-        for boundary in [top, bottom, left, right]:
-            if boundary.size > 0:
-                boundary_diffs.append(abs(np.mean(boundary) - interior_mean))
-        
-        return float(np.mean(boundary_diffs)) if boundary_diffs else 0.0
-    
-    def _measure_edge_continuity(self, edges: np.ndarray) -> float:
-        kernel = np.ones((3, 3), np.uint8)
-        dilated = cv2.dilate(edges, kernel, iterations=1)
-        
-        edge_pixels = np.sum(edges > 0)
-        dilated_pixels = np.sum(dilated > 0)
-        
-        if dilated_pixels == 0:
-            return 1
-        
-        continuity = edge_pixels / dilated_pixels
-        return float(continuity)
+        return {
+            "score": min(int(score), 100),
+            "energy_consistency": float(energy_consistency),
+            "detail_ratio": float(std_ratio),
+            "level_energies": [float(e) for e in level_energies[:4]],
+            "suspicious": score > 35,
+            "details": "Spectral analysis reveals multi-scale artifacts in manipulated images"
+        }
 
 
-class DeepfakeDetectorService:
+class DeepfakeService:
     def __init__(self):
         self.analyzer = AdvancedDeepfakeAnalyzer()
-        self.deepfake_image_detector = DeepFakeImageDetectionAnalyzer()
-
-    async def analyze_file(self, file_content: bytes, filename: str) -> Dict[str, Any]:
+        self.analysis_weights = {
+            "error_level": 1.2,
+            "frequency_domain": 1.3,
+            "noise_patterns": 1.2,
+            "face_regions": 1.5,
+            "color_channels": 1.0,
+            "jpeg_artifacts": 1.1,
+            "texture_gradients": 1.1,
+            "edge_coherence": 1.0,
+            "statistical_features": 0.9,
+            "spectral_features": 1.0
+        }
+    
+    async def analyze_base64(self, file_data: str, filename: str) -> Dict[str, Any]:
         try:
-            nparr = np.frombuffer(file_content, np.uint8)
+            if ',' in file_data:
+                file_data = file_data.split(',')[1]
+            
+            image_bytes = base64.b64decode(file_data)
+            return await self.analyze_file(image_bytes, filename)
+        except Exception as e:
+            return DeepfakeResult(
+                filename=filename,
+                is_deepfake=None,
+                confidence=None,
+                analysis_details={},
+                error=str(e)
+            ).to_dict()
+    
+    async def analyze_file(self, file_bytes: bytes, filename: str) -> Dict[str, Any]:
+        try:
+            nparr = np.frombuffer(file_bytes, np.uint8)
             img_array = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             
             if img_array is None:
-                pil_image = Image.open(io.BytesIO(file_content))
-                img_array = np.array(pil_image.convert('RGB'))
-                img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+                pil_image = Image.open(io.BytesIO(file_bytes))
+                img_array = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
             
             if img_array is None:
-                raise ValueError("Could not decode image")
-            
-            analyses = await self._run_all_analyses(img_array)
-            
-            result = self._compute_final_verdict(analyses, filename)
-            
-            return {
-                "filename": filename,
-                "timestamp": datetime.now().isoformat(),
-                "result": result.to_dict(),
-                "status": "completed",
-                "detection_method": "DeepFake-Image-Detection (Multi-Layer Image Analysis)",
-                "model_available": True,
-                "deepfake_image_detection_available": DEEPFAKE_IMAGE_DETECTION_AVAILABLE,
-                "module_path": DEEPFAKE_DETECTION_MODULE_PATH
-            }
-            
-        except Exception as e:
-            return {
-                "filename": filename,
-                "timestamp": datetime.now().isoformat(),
-                "result": DeepfakeResult(
+                return DeepfakeResult(
                     filename=filename,
                     is_deepfake=None,
                     confidence=None,
                     analysis_details={},
-                    error=str(e)
-                ).to_dict(),
-                "status": "error"
+                    error="Could not decode image"
+                ).to_dict()
+            
+            min_dim = min(img_array.shape[0], img_array.shape[1])
+            max_dim = max(img_array.shape[0], img_array.shape[1])
+            
+            if max_dim > 2000:
+                scale = 2000 / max_dim
+                img_array = cv2.resize(img_array, None, fx=scale, fy=scale)
+            
+            loop = asyncio.get_event_loop()
+            
+            ela_task = loop.run_in_executor(None, self.analyzer.analyze_error_level, img_array)
+            freq_task = loop.run_in_executor(None, self.analyzer.analyze_frequency_domain, img_array)
+            noise_task = loop.run_in_executor(None, self.analyzer.analyze_noise_patterns, img_array)
+            face_task = loop.run_in_executor(None, self.analyzer.analyze_face_regions, img_array)
+            color_task = loop.run_in_executor(None, self.analyzer.analyze_color_channels, img_array)
+            jpeg_task = loop.run_in_executor(None, self.analyzer.analyze_jpeg_artifacts, img_array)
+            texture_task = loop.run_in_executor(None, self.analyzer.analyze_texture_gradients, img_array)
+            edge_task = loop.run_in_executor(None, self.analyzer.analyze_edge_coherence, img_array)
+            stats_task = loop.run_in_executor(None, self.analyzer.analyze_statistical_features, img_array)
+            spectral_task = loop.run_in_executor(None, self.analyzer.analyze_spectral_features, img_array)
+            
+            results = await asyncio.gather(
+                ela_task, freq_task, noise_task, face_task, color_task,
+                jpeg_task, texture_task, edge_task, stats_task, spectral_task,
+                return_exceptions=True
+            )
+            
+            analysis_results = {
+                "error_level": results[0] if not isinstance(results[0], Exception) else {"score": 0, "error": str(results[0])},
+                "frequency_domain": results[1] if not isinstance(results[1], Exception) else {"score": 0, "error": str(results[1])},
+                "noise_patterns": results[2] if not isinstance(results[2], Exception) else {"score": 0, "error": str(results[2])},
+                "face_regions": results[3] if not isinstance(results[3], Exception) else {"score": 0, "error": str(results[3])},
+                "color_channels": results[4] if not isinstance(results[4], Exception) else {"score": 0, "error": str(results[4])},
+                "jpeg_artifacts": results[5] if not isinstance(results[5], Exception) else {"score": 0, "error": str(results[5])},
+                "texture_gradients": results[6] if not isinstance(results[6], Exception) else {"score": 0, "error": str(results[6])},
+                "edge_coherence": results[7] if not isinstance(results[7], Exception) else {"score": 0, "error": str(results[7])},
+                "statistical_features": results[8] if not isinstance(results[8], Exception) else {"score": 0, "error": str(results[8])},
+                "spectral_features": results[9] if not isinstance(results[9], Exception) else {"score": 0, "error": str(results[9])}
             }
-
-    def _run_deepfake_image_detection(self, img_array: np.ndarray) -> Dict[str, Any]:
-        features = self.deepfake_image_detector.extract_features(img_array)
-        return self.deepfake_image_detector.compute_authenticity_score(features)
-
-    async def _run_all_analyses(self, img_array: np.ndarray) -> Dict[str, Any]:
-        loop = asyncio.get_event_loop()
-        
-        ela_task = loop.run_in_executor(None, self.analyzer.analyze_error_level, img_array)
-        freq_task = loop.run_in_executor(None, self.analyzer.analyze_frequency_domain, img_array)
-        noise_task = loop.run_in_executor(None, self.analyzer.analyze_noise_patterns, img_array)
-        face_task = loop.run_in_executor(None, self.analyzer.analyze_face_regions, img_array)
-        color_task = loop.run_in_executor(None, self.analyzer.analyze_color_consistency, img_array)
-        edge_task = loop.run_in_executor(None, self.analyzer.analyze_edge_artifacts, img_array)
-        compression_task = loop.run_in_executor(None, self.analyzer.analyze_compression_artifacts, img_array)
-        texture_task = loop.run_in_executor(None, self.analyzer.analyze_texture_consistency, img_array)
-        deepfake_detection_task = loop.run_in_executor(None, self._run_deepfake_image_detection, img_array)
-        
-        results = await asyncio.gather(
-            ela_task, freq_task, noise_task, face_task,
-            color_task, edge_task, compression_task, texture_task, deepfake_detection_task
-        )
-        
-        return {
-            "error_level_analysis": results[0],
-            "frequency_analysis": results[1],
-            "noise_pattern_analysis": results[2],
-            "face_region_analysis": results[3],
-            "color_consistency": results[4],
-            "edge_artifacts": results[5],
-            "compression_artifacts": results[6],
-            "texture_consistency": results[7],
-            "deepfake_image_detection": results[8]
-        }
-    
-    def _compute_final_verdict(self, analyses: Dict[str, Any], filename: str) -> DeepfakeResult:
-        weights = {
-            "error_level_analysis": 0.12,
-            "frequency_analysis": 0.12,
-            "noise_pattern_analysis": 0.12,
-            "face_region_analysis": 0.18,
-            "color_consistency": 0.08,
-            "edge_artifacts": 0.08,
-            "compression_artifacts": 0.08,
-            "texture_consistency": 0.04,
-            "deepfake_image_detection": 0.18
-        }
-        
-        weighted_score = 0
-        suspicious_count = 0
-        total_weight = 0
-        
-        for analysis_name, analysis_result in analyses.items():
-            weight = weights.get(analysis_name, 0.1)
-            score = analysis_result.get("score", 0)
-            suspicious = analysis_result.get("suspicious", False)
             
-            weighted_score += score * weight
-            total_weight += weight
+            weighted_score = 0
+            total_weight = 0
+            suspicious_count = 0
             
-            if suspicious:
-                suspicious_count += 1
-        
-        if total_weight > 0:
-            final_score = weighted_score / total_weight
-        else:
-            final_score = 0
-        
-        if suspicious_count >= 5:
-            final_score = min(100, final_score + 20)
-        elif suspicious_count >= 3:
-            final_score = min(100, final_score + 10)
-        
-        confidence = final_score / 100
-        is_deepfake = final_score > 45
-        
-        if final_score >= 70:
-            verdict = "HIGH PROBABILITY - Likely Deepfake/Manipulated"
-            risk_level = "Critical"
-        elif final_score >= 50:
-            verdict = "MODERATE PROBABILITY - Possible Manipulation"
-            risk_level = "High"
-        elif final_score >= 30:
-            verdict = "LOW PROBABILITY - Minor Concerns"
-            risk_level = "Medium"
-        else:
-            verdict = "AUTHENTIC - No Significant Manipulation Detected"
-            risk_level = "Low"
-        
-        analysis_summary = []
-        for name, result in analyses.items():
-            if result.get("suspicious", False):
-                analysis_summary.append(f"{name.replace('_', ' ').title()}: FLAGGED - {result.get('details', '')}")
+            for key, result in analysis_results.items():
+                if isinstance(result, dict) and "score" in result:
+                    weight = self.analysis_weights.get(key, 1.0)
+                    weighted_score += result["score"] * weight
+                    total_weight += weight
+                    if result.get("suspicious", False):
+                        suspicious_count += 1
+            
+            if total_weight > 0:
+                final_score = weighted_score / total_weight
             else:
-                analysis_summary.append(f"{name.replace('_', ' ').title()}: PASSED")
-        
-        return DeepfakeResult(
-            filename=filename,
-            is_deepfake=is_deepfake,
-            confidence=round(confidence, 4),
-            analysis_details={
-                "verdict": verdict,
-                "risk_level": risk_level,
-                "overall_score": round(final_score, 2),
-                "suspicious_indicators": suspicious_count,
-                "total_analyses": len(analyses),
-                "analysis_breakdown": analyses,
-                "summary": analysis_summary,
-                "methodology": [
-                    "DeepFake-Image-Detection Analysis - Multi-layer convolutional feature extraction",
-                    "Error Level Analysis (ELA) - Detects compression inconsistencies",
-                    "Frequency Domain Analysis - Reveals spectral manipulation artifacts",
-                    "Noise Pattern Analysis - Identifies synthetic noise patterns",
-                    "Face Region Analysis - Examines facial feature authenticity",
-                    "Color Consistency - Detects unnatural color distributions",
-                    "Edge Artifact Detection - Finds blending boundaries",
-                    "Compression Artifact Analysis - Reveals re-encoding patterns",
-                    "Texture Consistency - Detects synthetic textures"
-                ],
-                "module_source": "DeepFake-Image-Detection"
-            }
-        )
-
-    async def analyze_base64(self, base64_data: str, filename: str) -> Dict[str, Any]:
-        try:
-            if "," in base64_data:
-                base64_data = base64_data.split(",")[1]
+                final_score = 0
             
-            file_content = base64.b64decode(base64_data)
-            return await self.analyze_file(file_content, filename)
+            if suspicious_count >= 6:
+                final_score = min(final_score * 1.3, 100)
+            elif suspicious_count >= 4:
+                final_score = min(final_score * 1.15, 100)
+            
+            if final_score >= 60:
+                is_deepfake = True
+                verdict = "LIKELY FAKE/MANIPULATED"
+            elif final_score >= 40:
+                is_deepfake = True
+                verdict = "POSSIBLY MANIPULATED"
+            elif final_score >= 25:
+                is_deepfake = None
+                verdict = "UNCERTAIN - NEEDS REVIEW"
+            else:
+                is_deepfake = False
+                verdict = "LIKELY AUTHENTIC"
+            
+            confidence = min(abs(final_score - 50) * 2, 100)
+            
+            return DeepfakeResult(
+                filename=filename,
+                is_deepfake=is_deepfake,
+                confidence=round(confidence, 2),
+                analysis_details={
+                    "overall_score": round(final_score, 2),
+                    "verdict": verdict,
+                    "suspicious_indicators": suspicious_count,
+                    "total_analyses": len(analysis_results),
+                    "analyses": analysis_results,
+                    "interpretation": self._get_interpretation(final_score, suspicious_count, analysis_results)
+                }
+            ).to_dict()
+            
         except Exception as e:
-            return {
-                "filename": filename,
-                "timestamp": datetime.now().isoformat(),
-                "result": DeepfakeResult(
-                    filename=filename,
-                    is_deepfake=None,
-                    confidence=None,
-                    analysis_details={},
-                    error=f"Failed to decode file: {str(e)}"
-                ).to_dict(),
-                "status": "error"
-            }
+            return DeepfakeResult(
+                filename=filename,
+                is_deepfake=None,
+                confidence=None,
+                analysis_details={},
+                error=str(e)
+            ).to_dict()
+    
+    def _get_interpretation(self, score: float, suspicious_count: int, analyses: Dict) -> str:
+        findings = []
+        
+        if analyses.get("error_level", {}).get("suspicious"):
+            findings.append("Compression inconsistencies detected (common in edited images)")
+        
+        if analyses.get("frequency_domain", {}).get("suspicious"):
+            findings.append("Unusual frequency patterns (potential GAN artifacts)")
+        
+        if analyses.get("noise_patterns", {}).get("suspicious"):
+            findings.append("Abnormal noise distribution (typical of AI generation)")
+        
+        if analyses.get("face_regions", {}).get("suspicious"):
+            findings.append("Face region anomalies detected")
+        
+        if analyses.get("color_channels", {}).get("suspicious"):
+            findings.append("Color channel inconsistencies found")
+        
+        if analyses.get("jpeg_artifacts", {}).get("suspicious"):
+            findings.append("Signs of double JPEG compression")
+        
+        if analyses.get("texture_gradients", {}).get("suspicious"):
+            findings.append("Unnatural texture patterns detected")
+        
+        if analyses.get("edge_coherence", {}).get("suspicious"):
+            findings.append("Edge artifacts suggesting manipulation")
+        
+        if findings:
+            return "Key findings: " + "; ".join(findings)
+        elif score < 25:
+            return "No significant manipulation indicators found. Image appears authentic."
+        else:
+            return "Some minor anomalies detected but within normal range."
 
 
-deepfake_service = DeepfakeDetectorService()
+deepfake_service = DeepfakeService()

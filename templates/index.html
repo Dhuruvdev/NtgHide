@@ -1192,7 +1192,7 @@
             resultsSection.classList.add('active');
             resultsStatus.className = 'results-status scanning';
             resultsStatus.textContent = 'Analyzing...';
-            resultsBody.innerHTML = '<div class="scanning-animation"><img src="/static/images/scanning.gif" alt="Analyzing" class="scanning-gif"><div class="scanning-text">ANALYZING MEDIA...</div><div class="scanning-subtext">Running advanced FACTOR & MesoNet detection algorithms</div></div>';
+            resultsBody.innerHTML = '<div class="scanning-animation"><img src="/static/images/scanning.gif" alt="Analyzing" class="scanning-gif"><div class="scanning-text">ANALYZING MEDIA...</div><div class="scanning-subtext">Running 10 advanced forensic detection algorithms (ELA, FFT, DCT, GLCM, Noise Analysis...)</div></div>';
 
             try {
                 var formData = new FormData();
@@ -1226,7 +1226,7 @@
             var resultsStatus = document.getElementById('deepfake-results-status');
             var resultsBody = document.getElementById('deepfake-results-body');
 
-            var result = data.result;
+            var result = data;
             
             if (result.error) {
                 resultsStatus.className = 'results-status error';
@@ -1235,38 +1235,123 @@
                 return;
             }
 
+            var details = result.analysis_details || {};
+            var overallScore = details.overall_score || 0;
+            var verdict = details.verdict || 'UNKNOWN';
+
             if (result.is_deepfake === true) {
-                resultsStatus.className = 'results-status error';
-                resultsStatus.textContent = 'DEEPFAKE DETECTED';
+                if (overallScore >= 60) {
+                    resultsStatus.className = 'results-status critical';
+                    resultsStatus.textContent = 'LIKELY FAKE/MANIPULATED';
+                } else {
+                    resultsStatus.className = 'results-status warning';
+                    resultsStatus.textContent = 'POSSIBLY MANIPULATED';
+                }
             } else if (result.is_deepfake === false) {
                 resultsStatus.className = 'results-status success';
-                resultsStatus.textContent = 'AUTHENTIC';
+                resultsStatus.textContent = 'LIKELY AUTHENTIC';
             } else {
-                resultsStatus.className = 'results-status scanning';
-                resultsStatus.textContent = 'UNKNOWN';
+                resultsStatus.className = 'results-status low';
+                resultsStatus.textContent = 'UNCERTAIN - NEEDS REVIEW';
             }
 
-            var html = '<div class="result-item">';
-            html += '<div class="result-source">';
-            html += '<span class="result-source-name">FACTOR Analysis</span>';
+            var html = '';
+            
+            html += '<div class="threat-summary">';
+            var threatClass = overallScore >= 60 ? 'threat-critical' : (overallScore >= 40 ? 'threat-high' : (overallScore >= 25 ? 'threat-medium' : 'threat-low'));
+            html += '<div class="threat-header ' + threatClass + '">';
+            html += '<span class="threat-icon">' + (overallScore >= 40 ? '&#9888;' : '&#10003;') + '</span>';
+            html += '<span class="threat-title">' + verdict + '</span>';
             html += '</div>';
-            html += '<div class="result-details">';
-            html += '<p><strong>File:</strong> ' + result.filename + '</p>';
+            
+            html += '<div style="margin-top: 15px;">';
+            html += '<div style="display: flex; justify-content: space-between; margin-bottom: 8px;">';
+            html += '<span style="color: #888; font-size: 12px;">Manipulation Score</span>';
+            html += '<span style="color: ' + (overallScore >= 60 ? '#ff0000' : (overallScore >= 40 ? '#ffaa00' : '#00ff00')) + '; font-weight: bold;">' + overallScore.toFixed(1) + '%</span>';
+            html += '</div>';
+            html += '<div style="background: #222; border-radius: 4px; height: 8px; overflow: hidden;">';
+            var barColor = overallScore >= 60 ? '#ff0000' : (overallScore >= 40 ? '#ffaa00' : '#00ff00');
+            html += '<div style="width: ' + overallScore + '%; height: 100%; background: ' + barColor + ';"></div>';
+            html += '</div>';
+            html += '</div>';
             
             if (result.confidence !== null) {
-                html += '<p><strong>Confidence:</strong> ' + (result.confidence * 100).toFixed(2) + '%</p>';
+                html += '<div style="margin-top: 10px; color: #888; font-size: 12px;">Confidence: <span style="color: #fff;">' + result.confidence.toFixed(1) + '%</span></div>';
             }
             
-            if (result.is_deepfake !== null) {
-                html += '<p><strong>Result:</strong> ' + (result.is_deepfake ? 'This appears to be a DEEPFAKE' : 'This appears to be AUTHENTIC') + '</p>';
+            if (details.suspicious_indicators !== undefined) {
+                html += '<div style="margin-top: 10px; color: #888; font-size: 12px;">Suspicious Indicators: <span style="color: ' + (details.suspicious_indicators >= 4 ? '#ff4444' : '#ffaa00') + ';">' + details.suspicious_indicators + ' / ' + details.total_analyses + '</span></div>';
+            }
+            html += '</div>';
+            
+            if (details.interpretation) {
+                html += '<div class="recommendations-section" style="margin-top: 15px;">';
+                html += '<div class="section-title">Analysis Summary</div>';
+                html += '<div style="color: #aaa; font-size: 13px; line-height: 1.6;">' + details.interpretation + '</div>';
+                html += '</div>';
             }
             
-            if (result.analysis_details && Object.keys(result.analysis_details).length > 0) {
-                html += '<p><strong>Details:</strong></p>';
-                html += '<pre>' + JSON.stringify(result.analysis_details, null, 2) + '</pre>';
+            if (details.analyses) {
+                html += '<div class="findings-section" style="margin-top: 15px;">';
+                html += '<div class="section-title">Detailed Analysis Results</div>';
+                
+                var analysisLabels = {
+                    'error_level': 'Error Level Analysis (ELA)',
+                    'frequency_domain': 'Frequency Domain Analysis',
+                    'noise_patterns': 'Noise Pattern Analysis',
+                    'face_regions': 'Face Region Analysis',
+                    'color_channels': 'Color Channel Analysis',
+                    'jpeg_artifacts': 'JPEG Artifact Detection',
+                    'texture_gradients': 'Texture Gradient Analysis',
+                    'edge_coherence': 'Edge Coherence Analysis',
+                    'statistical_features': 'Statistical Feature Analysis',
+                    'spectral_features': 'Spectral Analysis'
+                };
+                
+                for (var key in details.analyses) {
+                    var analysis = details.analyses[key];
+                    if (!analysis || analysis.error) continue;
+                    
+                    var score = analysis.score || 0;
+                    var isSuspicious = analysis.suspicious || false;
+                    var label = analysisLabels[key] || key;
+                    
+                    html += '<div class="finding-item ' + (isSuspicious ? 'threat-high' : 'threat-low') + '" style="margin-bottom: 10px;">';
+                    html += '<div class="finding-header">';
+                    html += '<span class="finding-threat" style="background: ' + (isSuspicious ? 'rgba(255, 68, 68, 0.2)' : 'rgba(0, 255, 0, 0.2)') + '; color: ' + (isSuspicious ? '#ff4444' : '#00ff00') + ';">' + (isSuspicious ? 'SUSPICIOUS' : 'NORMAL') + '</span>';
+                    html += '<span style="color: #fff; font-size: 13px; font-weight: bold;">' + label + '</span>';
+                    html += '<span style="color: #888; font-size: 11px; margin-left: auto;">Score: ' + score + '</span>';
+                    html += '</div>';
+                    
+                    if (analysis.details) {
+                        html += '<div class="finding-desc" style="margin-top: 5px; font-size: 11px;">' + analysis.details + '</div>';
+                    }
+                    
+                    html += '<div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px;">';
+                    for (var metricKey in analysis) {
+                        if (['score', 'suspicious', 'details', 'error', 'face_analyses'].indexOf(metricKey) === -1) {
+                            var val = analysis[metricKey];
+                            if (typeof val === 'number') {
+                                val = val.toFixed(3);
+                            } else if (typeof val === 'boolean') {
+                                val = val ? 'Yes' : 'No';
+                            } else if (Array.isArray(val)) {
+                                val = val.length + ' items';
+                            }
+                            html += '<span style="background: #1a1a1a; padding: 2px 8px; border-radius: 3px; font-size: 10px; color: #888;">' + metricKey.replace(/_/g, ' ') + ': <span style="color: #aaa;">' + val + '</span></span>';
+                        }
+                    }
+                    html += '</div>';
+                    html += '</div>';
+                }
+                
+                html += '</div>';
             }
             
-            html += '</div></div>';
+            html += '<div style="margin-top: 15px; padding: 10px; background: #0a0a0a; border-radius: 4px; font-size: 11px; color: #666;">';
+            html += '<strong>File:</strong> ' + result.filename + '<br>';
+            html += '<strong>Analyzed:</strong> ' + (result.timestamp || new Date().toISOString());
+            html += '</div>';
 
             resultsBody.innerHTML = html;
         }
