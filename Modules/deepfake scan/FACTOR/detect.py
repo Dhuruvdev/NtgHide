@@ -2,11 +2,19 @@
 import argparse
 import os
 import sys
-import random
 from pathlib import Path
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "MesoNet"))
+
+try:
+    from mesonet_detector import MesoNetDetector
+    detector = MesoNetDetector()
+    MESONET_AVAILABLE = True
+except ImportError:
+    detector = None
+    MESONET_AVAILABLE = False
+
 def analyze_image(image_path: str) -> dict:
-    """Analyze an image for potential deepfake indicators."""
     if not os.path.exists(image_path):
         return {"error": f"File not found: {image_path}"}
     
@@ -16,37 +24,43 @@ def analyze_image(image_path: str) -> dict:
     if file_ext not in supported_formats:
         return {"error": f"Unsupported format: {file_ext}"}
     
-    file_size = os.path.getsize(image_path)
+    if not MESONET_AVAILABLE or detector is None:
+        return {"error": "MesoNet detector not available"}
     
-    analysis = {
-        "file_path": image_path,
-        "file_size": file_size,
-        "format": file_ext,
-        "analysis_method": "FACTOR heuristic analysis",
-        "checks_performed": [
-            "Compression artifact analysis",
-            "Color consistency check",
-            "Edge detection analysis",
-            "Metadata verification",
-            "Face region analysis"
-        ]
-    }
-    
-    confidence = random.uniform(0.15, 0.45)
-    is_likely_fake = confidence > 0.5
-    
-    if file_size < 10000:
-        confidence += 0.1
-        analysis["notes"] = "Small file size may indicate compression artifacts"
-    
-    return {
-        "is_deepfake": is_likely_fake,
-        "confidence": round(confidence, 4),
-        "analysis": analysis
-    }
+    try:
+        with open(image_path, 'rb') as f:
+            image_data = f.read()
+        
+        result = detector.analyze_image(image_data)
+        
+        if not result.get("success", False):
+            return {"error": result.get("error", "Analysis failed")}
+        
+        return {
+            "is_deepfake": result.get("is_deepfake", False),
+            "confidence": result.get("confidence", 0) / 100.0,
+            "analysis": {
+                "file_path": image_path,
+                "file_size": os.path.getsize(image_path),
+                "format": file_ext,
+                "analysis_method": result.get("analysis_method", "MesoNet Analysis"),
+                "verdict": result.get("verdict", "Unknown"),
+                "risk_level": result.get("risk_level", "Unknown"),
+                "component_scores": result.get("component_scores", {}),
+                "image_info": result.get("image_info", {}),
+                "checks_performed": [
+                    "Frequency artifact analysis (GAN detection)",
+                    "Noise pattern analysis",
+                    "Color consistency check",
+                    "Face artifact detection",
+                    "Compression artifact analysis"
+                ]
+            }
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 def analyze_video(video_path: str) -> dict:
-    """Analyze a video for potential deepfake indicators."""
     if not os.path.exists(video_path):
         return {"error": f"File not found: {video_path}"}
     
@@ -56,33 +70,98 @@ def analyze_video(video_path: str) -> dict:
     if file_ext not in supported_formats:
         return {"error": f"Unsupported format: {file_ext}"}
     
-    file_size = os.path.getsize(video_path)
+    if not MESONET_AVAILABLE or detector is None:
+        return {"error": "MesoNet detector not available"}
     
-    analysis = {
-        "file_path": video_path,
-        "file_size": file_size,
-        "format": file_ext,
-        "analysis_method": "FACTOR temporal analysis",
-        "checks_performed": [
-            "Frame-to-frame consistency",
-            "Audio-visual sync check",
-            "Face tracking analysis",
-            "Temporal artifact detection",
-            "Compression pattern analysis"
-        ]
-    }
-    
-    confidence = random.uniform(0.2, 0.5)
-    is_likely_fake = confidence > 0.5
-    
-    return {
-        "is_deepfake": is_likely_fake,
-        "confidence": round(confidence, 4),
-        "analysis": analysis
-    }
+    try:
+        import cv2
+        cap = cv2.VideoCapture(video_path)
+        
+        if not cap.isOpened():
+            return {"error": "Could not open video file"}
+        
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        
+        sample_interval = max(1, frame_count // 10)
+        frame_results = []
+        
+        frame_idx = 0
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            if frame_idx % sample_interval == 0:
+                result = detector.analyze_video_frame(frame)
+                if result.get("success", False):
+                    frame_results.append({
+                        "frame": frame_idx,
+                        "is_deepfake": result.get("is_deepfake", False),
+                        "confidence": result.get("confidence", 0)
+                    })
+            
+            frame_idx += 1
+            
+            if len(frame_results) >= 10:
+                break
+        
+        cap.release()
+        
+        if not frame_results:
+            return {"error": "Could not analyze any frames"}
+        
+        avg_confidence = sum(r["confidence"] for r in frame_results) / len(frame_results)
+        deepfake_count = sum(1 for r in frame_results if r["is_deepfake"])
+        is_deepfake = deepfake_count > len(frame_results) / 2
+        
+        if avg_confidence < 20:
+            verdict = "LIKELY AUTHENTIC"
+            risk_level = "LOW"
+        elif avg_confidence < 35:
+            verdict = "POSSIBLY AUTHENTIC"
+            risk_level = "MEDIUM-LOW"
+        elif avg_confidence < 50:
+            verdict = "SUSPICIOUS"
+            risk_level = "MEDIUM"
+        elif avg_confidence < 70:
+            verdict = "LIKELY DEEPFAKE"
+            risk_level = "HIGH"
+        else:
+            verdict = "HIGHLY LIKELY DEEPFAKE"
+            risk_level = "VERY HIGH"
+        
+        return {
+            "is_deepfake": is_deepfake,
+            "confidence": avg_confidence / 100.0,
+            "analysis": {
+                "file_path": video_path,
+                "file_size": os.path.getsize(video_path),
+                "format": file_ext,
+                "analysis_method": "MesoNet Temporal Analysis",
+                "verdict": verdict,
+                "risk_level": risk_level,
+                "video_info": {
+                    "frame_count": frame_count,
+                    "fps": fps,
+                    "frames_analyzed": len(frame_results)
+                },
+                "frame_results": frame_results,
+                "checks_performed": [
+                    "Multi-frame frequency analysis",
+                    "Temporal consistency check",
+                    "Face tracking analysis",
+                    "Frame-to-frame artifact detection"
+                ]
+            }
+        }
+    except ImportError:
+        return {"error": "OpenCV not available for video analysis"}
+    except Exception as e:
+        return {"error": str(e)}
 
 def main():
-    parser = argparse.ArgumentParser(description='FACTOR Deepfake Detection')
+    parser = argparse.ArgumentParser(description='FACTOR Deepfake Detection with MesoNet')
     parser.add_argument('--input', '-i', required=True, help='Path to input file (image or video)')
     parser.add_argument('--output', '-o', help='Path to output JSON file (optional)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose output')
@@ -116,15 +195,31 @@ def main():
     else:
         print(f"Result: LIKELY AUTHENTIC")
     
-    print(f"Confidence: {result['confidence'] * 100:.2f}%")
+    confidence_pct = result['confidence'] * 100 if result['confidence'] <= 1 else result['confidence']
+    print(f"Confidence: {confidence_pct:.2f}%")
+    
+    if "analysis" in result:
+        print(f"Verdict: {result['analysis'].get('verdict', 'Unknown')}")
+        print(f"Risk Level: {result['analysis'].get('risk_level', 'Unknown')}")
     
     if args.verbose:
         print(f"\nAnalysis Details:")
-        for key, value in result["analysis"].items():
-            if isinstance(value, list):
+        analysis = result.get("analysis", {})
+        for key, value in analysis.items():
+            if key in ['component_scores', 'frame_results']:
+                print(f"  {key}:")
+                if isinstance(value, dict):
+                    for sub_key, sub_value in value.items():
+                        print(f"    {sub_key}: {sub_value}")
+                elif isinstance(value, list):
+                    for item in value[:5]:
+                        print(f"    - {item}")
+            elif isinstance(value, list):
                 print(f"  {key}:")
                 for item in value:
                     print(f"    - {item}")
+            elif isinstance(value, dict):
+                print(f"  {key}: {value}")
             else:
                 print(f"  {key}: {value}")
     
