@@ -86,7 +86,7 @@ async def deepfake_upload(file: UploadFile = File(...)):
 @app.get("/api/status")
 async def get_status():
     from services.darkweb_scanner import WHATBREACH_AVAILABLE, SPIDERFOOT_AVAILABLE
-    from services.deepfake_detector import MESONET_AVAILABLE
+    from services.deepfake_detector import MESONET_AVAILABLE, FACTOR_AVAILABLE
     
     modules_status = {
         "WhatBreach": {
@@ -119,9 +119,9 @@ async def get_status():
         },
         "FACTOR": {
             "installed": os.path.exists("Modules/deepfake scan/FACTOR"),
-            "active": MESONET_AVAILABLE,
+            "active": FACTOR_AVAILABLE,
             "path": "Modules/deepfake scan/FACTOR",
-            "features": ["Image deepfake detection", "Video deepfake analysis", "MesoNet integration"]
+            "features": ["Zero-shot deepfake detection", "Face forgery detection", "Audio-visual analysis", "Advanced AI detection"]
         }
     }
     
