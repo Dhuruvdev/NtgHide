@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <title>Censored Scanner</title>
+    <title>NOTHINGHIDE - Security Scanner</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -13,11 +14,15 @@
         }
 
         body {
-            font-family: 'Courier New', monospace;
-            background-color: #0a0a0a;
+            font-family: 'Share Tech Mono', 'Courier New', monospace;
+            background-color: #000000;
             color: #e0e0e0;
             min-height: 100vh;
             overflow-x: hidden;
+            background-image: 
+                radial-gradient(ellipse at center, rgba(50, 50, 50, 0.3) 0%, transparent 70%),
+                url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            background-blend-mode: overlay;
         }
 
         #loading-overlay {
@@ -43,16 +48,18 @@
         }
 
         .loading-gif {
-            width: 150px;
-            height: 150px;
-            border: 2px solid #333;
+            width: 200px;
+            height: auto;
+            border: none;
         }
 
         .loading-text {
             margin-top: 20px;
-            font-size: 18px;
-            color: #666;
-            letter-spacing: 3px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            color: #888;
+            letter-spacing: 5px;
+            text-transform: uppercase;
             animation: blink 1s infinite;
         }
 
@@ -75,7 +82,7 @@
         }
 
         .container {
-            max-width: 900px;
+            max-width: 950px;
             margin: 0 auto;
             padding: 40px 20px;
         }
@@ -84,52 +91,36 @@
             text-align: center;
             margin-bottom: 50px;
             padding-bottom: 30px;
-            border-bottom: 1px solid #222;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .glitch {
-            font-size: 48px;
-            font-weight: bold;
-            color: #fff;
-            text-shadow: 
-                2px 0 #ff0000,
-                -2px 0 #00ff00;
-            animation: glitch 2s infinite;
-            letter-spacing: 5px;
+        .logo-container {
+            margin-bottom: 10px;
         }
 
-        @keyframes glitch {
-            0%, 90%, 100% {
-                text-shadow: 2px 0 #ff0000, -2px 0 #00ff00;
-            }
-            92% {
-                text-shadow: -2px 0 #ff0000, 2px 0 #00ff00;
-            }
-            94% {
-                text-shadow: 2px 2px #ff0000, -2px -2px #00ff00;
-            }
-            96% {
-                text-shadow: -2px -2px #ff0000, 2px 2px #00ff00;
-            }
-            98% {
-                text-shadow: 2px 0 #ff0000, -2px 0 #00ff00;
-            }
+        .logo-image {
+            max-width: 280px;
+            height: auto;
+            filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.15));
         }
 
         .subtitle {
             margin-top: 15px;
-            font-size: 14px;
-            color: #555;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 12px;
+            color: #666;
             text-transform: uppercase;
-            letter-spacing: 10px;
+            letter-spacing: 8px;
+            font-weight: 400;
         }
 
         .card {
-            background: linear-gradient(135deg, #111 0%, #1a1a1a 100%);
-            border: 1px solid #222;
-            border-radius: 8px;
+            background: rgba(10, 10, 10, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 2px;
             margin-bottom: 25px;
             overflow: hidden;
+            backdrop-filter: blur(10px);
         }
 
         .card-header {
@@ -137,21 +128,23 @@
             align-items: center;
             gap: 12px;
             padding: 18px 24px;
-            background: #0f0f0f;
-            border-bottom: 1px solid #222;
+            background: rgba(0, 0, 0, 0.5);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .card-header h2 {
-            font-size: 16px;
-            font-weight: 500;
-            color: #aaa;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            color: #fff;
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 3px;
+            -webkit-text-stroke: 0.5px rgba(255, 255, 255, 0.8);
         }
 
         .status-indicator {
-            width: 10px;
-            height: 10px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             background: #00ff00;
             box-shadow: 0 0 10px #00ff00;
@@ -183,11 +176,12 @@
 
         .search-label {
             display: block;
+            font-family: 'Orbitron', sans-serif;
             color: #888;
-            font-size: 12px;
+            font-size: 11px;
             text-transform: uppercase;
-            letter-spacing: 2px;
-            margin-bottom: 10px;
+            letter-spacing: 3px;
+            margin-bottom: 12px;
         }
 
         .search-input-wrapper {
@@ -198,22 +192,23 @@
         .search-input {
             flex: 1;
             padding: 15px 20px;
-            background: #0a0a0a;
-            border: 1px solid #333;
-            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
             color: #fff;
-            font-family: 'Courier New', monospace;
+            font-family: 'Share Tech Mono', monospace;
             font-size: 14px;
             outline: none;
-            transition: border-color 0.3s ease;
+            transition: all 0.3s ease;
         }
 
         .search-input:focus {
-            border-color: #00ff00;
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
         }
 
         .search-input::placeholder {
-            color: #444;
+            color: #555;
         }
 
         .file-input-wrapper {
@@ -231,58 +226,58 @@
             justify-content: center;
             gap: 10px;
             padding: 15px 20px;
-            background: #0a0a0a;
-            border: 1px dashed #333;
-            border-radius: 6px;
-            color: #666;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            color: #888;
             font-size: 14px;
             cursor: pointer;
             transition: all 0.3s ease;
         }
 
         .file-input-label:hover {
-            border-color: #00ff00;
-            color: #00ff00;
+            border-color: rgba(255, 255, 255, 0.6);
+            color: #fff;
         }
 
         .file-input-label.has-file {
-            border-color: #00ff00;
+            border-color: rgba(255, 255, 255, 0.6);
             border-style: solid;
-            color: #00ff00;
+            color: #fff;
         }
 
         .btn {
             padding: 15px 30px;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 12px;
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 3px;
             border: none;
-            border-radius: 6px;
+            border-radius: 2px;
             cursor: pointer;
             transition: all 0.3s ease;
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
-            color: #00ff00;
-            border: 1px solid #00ff00;
+            background: transparent;
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.5);
         }
 
         .btn-primary:hover {
-            background: #00ff00;
-            color: #000;
-            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #fff;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
         }
 
         .btn-primary:disabled {
-            opacity: 0.5;
+            opacity: 0.4;
             cursor: not-allowed;
         }
 
         .btn-primary:disabled:hover {
-            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
-            color: #00ff00;
+            background: transparent;
+            border-color: rgba(255, 255, 255, 0.5);
             box-shadow: none;
         }
 
@@ -415,10 +410,12 @@
             border-top: 1px solid #222;
         }
 
-        .censored-text {
-            font-size: 12px;
-            color: #333;
-            letter-spacing: 5px;
+        .footer-text {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 10px;
+            color: #444;
+            letter-spacing: 4px;
+            text-transform: uppercase;
         }
 
         @media (max-width: 600px) {
@@ -836,15 +833,17 @@
 <body>
     <div id="loading-overlay">
         <div class="loading-container">
-            <img src="/static/images/loading.gif" alt="Loading" class="loading-gif">
-            <p class="loading-text">Loading...</p>
+            <img src="/static/images/logo.png" alt="NOTHINGHIDE" class="loading-gif">
+            <p class="loading-text">Initializing...</p>
         </div>
     </div>
 
     <div id="main-content" class="hidden">
         <div class="container">
             <header>
-                <h1 class="glitch" data-text="[CENSORED]">[CENSORED]</h1>
+                <div class="logo-container">
+                    <img src="/static/images/logo.png" alt="NOTHINGHIDE" class="logo-image">
+                </div>
                 <p class="subtitle">Security Scanner</p>
             </header>
 
@@ -908,7 +907,7 @@
             </main>
 
             <footer>
-                <p class="censored-text">&#9608;&#9608;&#9608;&#9608;&#9608; CLASSIFIED SYSTEM &#9608;&#9608;&#9608;&#9608;&#9608;</p>
+                <p class="footer-text">NOTHINGHIDE // SECURITY SCANNER v1.0</p>
             </footer>
         </div>
     </div>

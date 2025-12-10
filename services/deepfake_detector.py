@@ -80,12 +80,12 @@ class AdvancedDeepfakeAnalyzer:
             suspicious_score += 15
         
         return {
-            "score": min(suspicious_score, 100),
+            "score": int(min(suspicious_score, 100)),
             "mean_ela": float(mean_ela),
             "std_ela": float(std_ela),
             "max_ela": float(max_ela),
             "variance_ratio": float(variance_ratio),
-            "suspicious": suspicious_score > 40,
+            "suspicious": bool(suspicious_score > 40),
             "details": "Error Level Analysis detects compression inconsistencies"
         }
     
@@ -128,11 +128,11 @@ class AdvancedDeepfakeAnalyzer:
             suspicious_score += 30
         
         return {
-            "score": min(suspicious_score, 100),
+            "score": int(min(suspicious_score, 100)),
             "freq_ratio": float(freq_ratio),
             "profile_smoothness": float(profile_smoothness),
-            "periodic_patterns_detected": periodic_patterns,
-            "suspicious": suspicious_score > 35,
+            "periodic_patterns_detected": bool(periodic_patterns),
+            "suspicious": bool(suspicious_score > 35),
             "details": "Frequency analysis reveals manipulation artifacts in spectral domain"
         }
     
@@ -170,12 +170,12 @@ class AdvancedDeepfakeAnalyzer:
             suspicious_score += 20
         
         return {
-            "score": min(suspicious_score, 100),
-            "estimated_noise": float(noise_sigma),
+            "score": int(min(suspicious_score, 100)),
+            "estimated_noise": float(noise_sigma) if not isinstance(noise_sigma, (list, np.ndarray)) else 0.0,
             "laplacian_variance": float(laplacian_var),
             "noise_consistency": float(noise_variance),
             "noise_range": float(noise_range),
-            "suspicious": suspicious_score > 35,
+            "suspicious": bool(suspicious_score > 35),
             "details": "Noise pattern analysis reveals inconsistencies in image generation"
         }
     
@@ -230,10 +230,10 @@ class AdvancedDeepfakeAnalyzer:
             suspicious_score = max(suspicious_score, face_suspicious)
         
         return {
-            "score": min(suspicious_score, 100),
-            "faces_detected": len(faces),
+            "score": int(min(suspicious_score, 100)),
+            "faces_detected": int(len(faces)),
             "face_analyses": face_analyses,
-            "suspicious": suspicious_score > 40,
+            "suspicious": bool(suspicious_score > 40),
             "details": "Face region analysis examines facial features and boundaries"
         }
     
@@ -276,11 +276,11 @@ class AdvancedDeepfakeAnalyzer:
             suspicious_score += 20
         
         return {
-            "score": min(suspicious_score, 100),
+            "score": int(min(suspicious_score, 100)),
             "hue_variance": float(h_variance),
             "saturation_variance": float(s_variance),
             "lighting_variance": float(lighting_variance),
-            "suspicious": suspicious_score > 35,
+            "suspicious": bool(suspicious_score > 35),
             "details": "Color consistency analysis detects unnatural color distributions"
         }
     
@@ -307,11 +307,11 @@ class AdvancedDeepfakeAnalyzer:
             suspicious_score += 25
         
         return {
-            "score": min(suspicious_score, 100),
+            "score": int(min(suspicious_score, 100)),
             "edge_density": float(edge_density),
             "edge_continuity": float(edge_continuity),
             "gradient_consistency": float(gradient_consistency),
-            "suspicious": suspicious_score > 35,
+            "suspicious": bool(suspicious_score > 35),
             "details": "Edge artifact analysis detects blending and splicing boundaries"
         }
     
@@ -347,12 +347,12 @@ class AdvancedDeepfakeAnalyzer:
             suspicious_score += 30
         
         return {
-            "score": min(suspicious_score, 100),
+            "score": int(min(suspicious_score, 100)),
             "artifact_mean": float(artifact_mean),
             "artifact_std": float(artifact_std),
             "artifact_range": float(artifact_range),
-            "double_compression_suspected": double_compression,
-            "suspicious": suspicious_score > 40,
+            "double_compression_suspected": bool(double_compression),
+            "suspicious": bool(suspicious_score > 40),
             "details": "Compression artifact analysis reveals re-encoding patterns"
         }
     
@@ -397,10 +397,10 @@ class AdvancedDeepfakeAnalyzer:
             suspicious_score += 30
         
         return {
-            "score": min(suspicious_score, 100),
+            "score": int(min(suspicious_score, 100)),
             "texture_variance": float(texture_variance),
             "max_texture_difference": float(max_texture_diff),
-            "suspicious": suspicious_score > 30,
+            "suspicious": bool(suspicious_score > 30),
             "details": "Texture consistency analysis detects synthetic patterns"
         }
     
@@ -443,7 +443,7 @@ class AdvancedDeepfakeAnalyzer:
         peaks[center_y-5:center_y+5, center_x-5:center_x+5] = False
         
         num_peaks = np.sum(peaks)
-        return num_peaks > 20
+        return bool(num_peaks > 20)
     
     def _check_eye_symmetry(self, eyes: np.ndarray, face_width: int) -> float:
         if len(eyes) < 2:
@@ -460,7 +460,7 @@ class AdvancedDeepfakeAnalyzer:
         actual_distance = right_center - left_center
         
         symmetry = 1 - abs(expected_distance - actual_distance) / expected_distance
-        return max(0, min(1, symmetry))
+        return float(max(0, min(1, symmetry)))
     
     def _analyze_skin_uniformity(self, face_region: np.ndarray) -> float:
         if len(face_region.shape) != 3:
@@ -478,7 +478,7 @@ class AdvancedDeepfakeAnalyzer:
             return 0
         
         uniformity = 1 - (np.std(skin_pixels) / 128)
-        return max(0, min(1, uniformity))
+        return float(max(0, min(1, uniformity)))
     
     def _analyze_face_boundary(self, img: np.ndarray, x: int, y: int, w: int, h: int) -> float:
         border_width = 5
@@ -500,7 +500,7 @@ class AdvancedDeepfakeAnalyzer:
             if boundary.size > 0:
                 boundary_diffs.append(abs(np.mean(boundary) - interior_mean))
         
-        return np.mean(boundary_diffs) if boundary_diffs else 0
+        return float(np.mean(boundary_diffs)) if boundary_diffs else 0.0
     
     def _measure_edge_continuity(self, edges: np.ndarray) -> float:
         kernel = np.ones((3, 3), np.uint8)
@@ -513,7 +513,7 @@ class AdvancedDeepfakeAnalyzer:
             return 1
         
         continuity = edge_pixels / dilated_pixels
-        return continuity
+        return float(continuity)
 
 
 class DeepfakeDetectorService:
