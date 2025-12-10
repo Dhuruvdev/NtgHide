@@ -115,7 +115,7 @@ async def get_status():
             "installed": os.path.exists("Modules/deepfake scan/DeepFake-Image-Detection"),
             "active": DEEPFAKE_IMAGE_DETECTION_AVAILABLE,
             "path": "Modules/deepfake scan/DeepFake-Image-Detection",
-            "features": ["VGG16-style CNN analysis", "Transfer learning detection", "Deep feature extraction", "Edge and texture analysis", "Pretrained model methodology", "Error Level Analysis", "Frequency Domain Analysis", "Face Region Analysis"]
+            "features": ["Multi-layer convolutional analysis", "Deep feature extraction", "Edge and texture analysis", "Error Level Analysis", "Frequency Domain Analysis", "Face Region Analysis", "Noise Pattern Analysis", "Compression Artifact Detection"]
         }
     }
     

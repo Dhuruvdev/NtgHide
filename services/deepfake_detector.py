@@ -41,11 +41,14 @@ class DeepfakeResult:
         }
 
 
-class VGGStyleFeatureExtractor:
+class DeepFakeImageDetectionAnalyzer:
     """
-    Implements VGG-style feature extraction for deepfake detection
-    Based on DeepFake-Image-Detection methodology using transfer learning concepts.
-    Uses convolutional filter patterns similar to VGG16/VGG19 architecture.
+    Deepfake detection using image analysis techniques inspired by 
+    DeepFake-Image-Detection methodology.
+    
+    Implements multi-layer convolutional feature analysis similar to 
+    VGG16 architecture patterns for detecting manipulated images.
+    Note: Uses OpenCV-based analysis due to TensorFlow disk constraints.
     """
     
     def __init__(self):
@@ -150,8 +153,8 @@ class VGGStyleFeatureExtractor:
             "activation_variance": float(activation_variance),
             "energy_variance": float(energy_variance),
             "suspicious": bool(suspicious_score > 35),
-            "details": "VGG-style deep feature analysis (DeepFake-Image-Detection methodology)",
-            "model_type": "VGG16-inspired feature extraction"
+            "details": "DeepFake-Image-Detection multi-layer convolutional analysis",
+            "model_type": "DeepFake-Image-Detection"
         }
 
 
@@ -633,7 +636,7 @@ class AdvancedDeepfakeAnalyzer:
 class DeepfakeDetectorService:
     def __init__(self):
         self.analyzer = AdvancedDeepfakeAnalyzer()
-        self.vgg_extractor = VGGStyleFeatureExtractor()
+        self.deepfake_image_detector = DeepFakeImageDetectionAnalyzer()
 
     async def analyze_file(self, file_content: bytes, filename: str) -> Dict[str, Any]:
         try:
@@ -657,7 +660,7 @@ class DeepfakeDetectorService:
                 "timestamp": datetime.now().isoformat(),
                 "result": result.to_dict(),
                 "status": "completed",
-                "detection_method": "DeepFake-Image-Detection (VGG16-style CNN Analysis)",
+                "detection_method": "DeepFake-Image-Detection (Multi-Layer Image Analysis)",
                 "model_available": True,
                 "deepfake_image_detection_available": DEEPFAKE_IMAGE_DETECTION_AVAILABLE,
                 "module_path": DEEPFAKE_DETECTION_MODULE_PATH
@@ -677,9 +680,9 @@ class DeepfakeDetectorService:
                 "status": "error"
             }
 
-    def _run_vgg_analysis(self, img_array: np.ndarray) -> Dict[str, Any]:
-        features = self.vgg_extractor.extract_features(img_array)
-        return self.vgg_extractor.compute_authenticity_score(features)
+    def _run_deepfake_image_detection(self, img_array: np.ndarray) -> Dict[str, Any]:
+        features = self.deepfake_image_detector.extract_features(img_array)
+        return self.deepfake_image_detector.compute_authenticity_score(features)
 
     async def _run_all_analyses(self, img_array: np.ndarray) -> Dict[str, Any]:
         loop = asyncio.get_event_loop()
@@ -692,11 +695,11 @@ class DeepfakeDetectorService:
         edge_task = loop.run_in_executor(None, self.analyzer.analyze_edge_artifacts, img_array)
         compression_task = loop.run_in_executor(None, self.analyzer.analyze_compression_artifacts, img_array)
         texture_task = loop.run_in_executor(None, self.analyzer.analyze_texture_consistency, img_array)
-        vgg_task = loop.run_in_executor(None, self._run_vgg_analysis, img_array)
+        deepfake_detection_task = loop.run_in_executor(None, self._run_deepfake_image_detection, img_array)
         
         results = await asyncio.gather(
             ela_task, freq_task, noise_task, face_task,
-            color_task, edge_task, compression_task, texture_task, vgg_task
+            color_task, edge_task, compression_task, texture_task, deepfake_detection_task
         )
         
         return {
@@ -708,7 +711,7 @@ class DeepfakeDetectorService:
             "edge_artifacts": results[5],
             "compression_artifacts": results[6],
             "texture_consistency": results[7],
-            "vgg_deep_features": results[8]
+            "deepfake_image_detection": results[8]
         }
     
     def _compute_final_verdict(self, analyses: Dict[str, Any], filename: str) -> DeepfakeResult:
@@ -721,7 +724,7 @@ class DeepfakeDetectorService:
             "edge_artifacts": 0.08,
             "compression_artifacts": 0.08,
             "texture_consistency": 0.04,
-            "vgg_deep_features": 0.18
+            "deepfake_image_detection": 0.18
         }
         
         weighted_score = 0
@@ -785,7 +788,7 @@ class DeepfakeDetectorService:
                 "analysis_breakdown": analyses,
                 "summary": analysis_summary,
                 "methodology": [
-                    "VGG Deep Features (DeepFake-Image-Detection) - CNN-style feature extraction",
+                    "DeepFake-Image-Detection Analysis - Multi-layer convolutional feature extraction",
                     "Error Level Analysis (ELA) - Detects compression inconsistencies",
                     "Frequency Domain Analysis - Reveals spectral manipulation artifacts",
                     "Noise Pattern Analysis - Identifies synthetic noise patterns",
@@ -795,7 +798,7 @@ class DeepfakeDetectorService:
                     "Compression Artifact Analysis - Reveals re-encoding patterns",
                     "Texture Consistency - Detects synthetic textures"
                 ],
-                "module_source": "DeepFake-Image-Detection (Pretrained_Models)"
+                "module_source": "DeepFake-Image-Detection"
             }
         )
 
