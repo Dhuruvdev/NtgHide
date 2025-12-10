@@ -92,3 +92,6 @@ uvicorn main:app --host 0.0.0.0 --port 5000 --reload
 - 2025-12-10: Added service layers for darkweb scanning and deepfake detection
 - 2025-12-10: Created API endpoints connecting frontend to services
 - 2025-12-10: All three darkweb modules run in parallel on single query
+- 2025-12-10: Enhanced threat classification system (CRITICAL, HIGH, MEDIUM, LOW)
+- 2025-12-10: Added categorized findings display with recommendations
+- 2025-12-10: Added GIF loading animations during scan operations
