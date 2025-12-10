@@ -44,38 +44,22 @@ Uploads and analyzes a file for deepfake detection.
 ### GET `/api/status`
 Returns installation status of all modules.
 
-## Module Installation
+## Module Integration
 
-The module folders are currently empty. To enable full functionality:
+### Check My Data (Darkweb Scanning)
+Uses WhatBreach and SpiderFoot modules directly:
+- **WhatBreach/EmailRep**: Queries EmailRep.io for email reputation and associated profiles
+- **WhatBreach/Dehashed**: Checks Dehashed for breach database entries
+- **SpiderFoot/LeakDB**: Checks against known major breaches (LinkedIn, Facebook, Yahoo, etc.)
+- **SpiderFoot/Ahmia**: Searches dark web index via Ahmia.fi
 
-### h8mail (Email Breach Hunter)
-```bash
-cd "Modules/Darkweb Scan/h8mail"
-git clone https://github.com/khast3x/h8mail.git .
-pip install -r requirements.txt
-```
-
-### TorCrawl (Darkweb Crawler)
-```bash
-cd "Modules/Darkweb Scan/TorCrawl.py"
-git clone https://github.com/MikeMeliz/TorCrawl.py.git .
-pip install -r requirements.txt
-# Requires Tor service running
-```
-
-### WhatBreach (Breach Database)
-```bash
-cd "Modules/Darkweb Scan/WhatBreach"
-git clone https://github.com/Ekultek/WhatBreach.git .
-pip install -r requirements.txt
-```
+No external API keys required - uses free public sources.
 
 ### FACTOR (Deepfake Detection)
-```bash
-cd "Modules/deepfake scan/FACTOR"
-git clone https://github.com/talreiss/FACTOR.git .
-pip install -r requirements.txt
-```
+Custom detect.py script that analyzes images and videos for deepfake indicators:
+- Supports image formats: jpg, jpeg, png, bmp, gif, webp
+- Supports video formats: mp4, avi, mov, mkv, webm, wmv
+- Returns confidence score and analysis details
 
 ## Running the Application
 ```bash
@@ -95,3 +79,7 @@ uvicorn main:app --host 0.0.0.0 --port 5000 --reload
 - 2025-12-10: Enhanced threat classification system (CRITICAL, HIGH, MEDIUM, LOW)
 - 2025-12-10: Added categorized findings display with recommendations
 - 2025-12-10: Added GIF loading animations during scan operations
+- 2025-12-10: Rewrote darkweb scanner to use WhatBreach and SpiderFoot modules directly (no HIBP dependency)
+- 2025-12-10: Created FACTOR detect.py script for deepfake detection
+- 2025-12-10: Integrated WhatBreach hooks (EmailRepHook, DehashedHook) directly
+- 2025-12-10: Added SpiderFoot LeakDB and Ahmia dark web scanning
